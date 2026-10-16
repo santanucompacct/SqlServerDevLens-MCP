@@ -8,6 +8,7 @@
         x:Class="SqlServerDevLens.Desktop.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="SQL Server DevLens MCP"
+        Icon="/Assets/devlens-owl.png"
         Width="880" Height="680"
         MinWidth="680" MinHeight="570"
         WindowStartupLocation="CenterScreen"
@@ -25,13 +26,10 @@
             <StackPanel Spacing="24">
                 <!-- App identity -->
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
-                    <Border Width="64" Height="64" CornerRadius="16"
-                            Background="#2563EB">
-                        <TextBlock Text="SQL" FontSize="19" FontWeight="Bold"
-                                   Foreground="White"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" />
-                    </Border>
+                    <Image Width="64" Height="64"
+                           Source="/Assets/devlens-owl.png"
+                           Stretch="Uniform"
+                           ToolTip.Tip="DevLens Owl" />
                     <StackPanel Grid.Column="1" Spacing="5"
                                 VerticalAlignment="Center">
                         <TextBlock Text="SQL Server DevLens MCP"
