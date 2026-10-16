@@ -74,7 +74,10 @@ public class ConcurrentServerTests
         await Assert.ThrowsAnyAsync<Exception>(async () => await first.Client.CallToolAsync("get_server_status", cancellationToken: timeout.Token));
         await Assert.ThrowsAnyAsync<Exception>(async () => await second.Client.CallToolAsync("get_server_status", cancellationToken: timeout.Token));
         var buffer = new byte[1];
-        Assert.Equal(0, await idle.ReadAsync(buffer, timeout.Token));
+        try { Assert.Equal(0, await idle.ReadAsync(buffer, timeout.Token)); }
+        catch (IOException error) when (error.InnerException is System.Net.Sockets.SocketException
+            { SocketErrorCode: System.Net.Sockets.SocketError.ConnectionReset })
+        { /* Unix may report reset instead of EOF when Stop closes an idle session. */ }
         await server.StartAsync(DateTimeOffset.UtcNow);
         await using var restarted = await ConnectAsync(name, timeout.Token);
         await AssertStatus(restarted, timeout.Token);
