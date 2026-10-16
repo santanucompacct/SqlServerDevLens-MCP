@@ -95,7 +95,8 @@ public class ServerTests
         await using var first = new DesktopMcpServer(name);
         await using var second = new DesktopMcpServer(name);
         await first.StartAsync(DateTimeOffset.UtcNow);
-        await Assert.ThrowsAsync<IOException>(() => second.StartAsync(DateTimeOffset.UtcNow));
+        var error = await Record.ExceptionAsync(() => second.StartAsync(DateTimeOffset.UtcNow));
+        Assert.True(error is IOException or UnauthorizedAccessException, $"Expected duplicate endpoint rejection, got {error?.GetType().Name ?? "no error"}.");
         await Task.WhenAll(first.StopAsync(), first.StopAsync());
         Assert.False(first.IsRunning);
     }

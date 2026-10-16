@@ -16,66 +16,111 @@ public interface IDesktopMcpServer : IAsyncDisposable
 // No TCP listener, credential file, SQL password, or persistent SQL connection.
 public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServer
 {
-    // Short names also fit macOS Unix-domain socket limits under its per-user temp directory.
+    public const int MaxConcurrentSessions = 16;
+    // Short names fit macOS Unix-domain socket limits in its per-user temp directory.
     public static string DefaultPipeName => "dvl-" + Convert.ToHexString(
         SHA256.HashData(Encoding.UTF8.GetBytes(Environment.UserName)))[..24];
     private readonly string _pipeName = pipeName ?? DefaultPipeName;
-    private NamedPipeServerStream? _pipe;
-    private CancellationTokenSource? _shutdown;
-    private Task? _loop;
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
-    public bool IsRunning { get; private set; }
+    private readonly SemaphoreSlim _slots = new(MaxConcurrentSessions, MaxConcurrentSessions);
+    private readonly object _sessionGate = new();
+    private readonly HashSet<Session> _sessions = [];
+    private NamedPipeServerStream? _listener;
+    private CancellationTokenSource? _shutdown;
+    private Task? _acceptLoop;
+    private volatile bool _isRunning;
+    public bool IsRunning => _isRunning;
     public event Action? StoppedUnexpectedly;
+
+    private NamedPipeServerStream CreateListener(bool firstInstance = false) => new(
+        _pipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
+        PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly |
+        (firstInstance ? PipeOptions.FirstPipeInstance : PipeOptions.None));
 
     public async Task StartAsync(DateTimeOffset sqlTestedAt)
     {
         await _lifecycle.WaitAsync();
         try
         {
-            if (_pipe is not null) throw new InvalidOperationException("Server is already started.");
-            // A single persistent instance prevents another desktop from claiming this endpoint.
-            _pipe = new NamedPipeServerStream(_pipeName, PipeDirection.InOut, 1,
-                PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            if (_shutdown is not null) throw new InvalidOperationException("Server is already started.");
+            // Reserve the endpoint exclusively, allowing multiple instances owned by this server.
+            _listener = CreateListener(firstInstance: true);
             _shutdown = new CancellationTokenSource();
-            IsRunning = true;
-            _loop = ServeAsync(_pipe, sqlTestedAt, _shutdown.Token);
+            _isRunning = true;
+            _acceptLoop = AcceptAsync(_listener, sqlTestedAt, _shutdown.Token);
         }
         finally { _lifecycle.Release(); }
     }
 
-    private async Task ServeAsync(NamedPipeServerStream pipe, DateTimeOffset sqlTestedAt, CancellationToken cancellationToken)
+    private async Task AcceptAsync(NamedPipeServerStream listener, DateTimeOffset sqlTestedAt, CancellationToken cancellationToken)
     {
+        var ownsSlot = false;
         try
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                await pipe.WaitForConnectionAsync(cancellationToken);
-                try
+                await _slots.WaitAsync(cancellationToken).ConfigureAwait(false);
+                ownsSlot = true;
+                await listener.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
+                var accepted = listener;
+                // Keep an accepting pipe alive before handing off this connection.
+                var next = CreateListener();
+                lock (_sessionGate)
                 {
-                    // Keep the listener alive when an MCP client disconnects; accept the next session.
-                    using var stream = new LeaveOpenStream(pipe);
-                    await using var server = McpServer.Create(new StreamServerTransport(stream, stream), new McpServerOptions
+                    if (cancellationToken.IsCancellationRequested)
                     {
-                        ToolCollection = [McpServerTool.Create(() => new
-                        {
-                            service = "SQL Server DevLens MCP", status = "running", transport = "desktop-pipe",
-                            sqlConfigured = false, sqlConnected = false, lastSqlTestSucceeded = true, lastSqlTestUtc = sqlTestedAt,
-                            postmanImplemented = false,
-                            message = "SQL connection was tested at the recorded time and disposed. Status tool only; no live SQL session or inspection tools."
-                        }, new() { Name = "get_server_status", Description = "Returns the desktop-controlled MCP server status and last SQL test time; does not query SQL." })]
-                    });
-                    await server.RunAsync(cancellationToken);
+                        next.Dispose();
+                        cancellationToken.ThrowIfCancellationRequested();
+                    }
+                    _listener = next;
+                    listener = next;
+                    var session = new Session(accepted);
+                    _sessions.Add(session);
+                    session.Completion = RunSessionAsync(session, sqlTestedAt, cancellationToken);
+                    ownsSlot = false;
                 }
-                catch (Exception ex) when (!cancellationToken.IsCancellationRequested && ex is IOException or System.Text.Json.JsonException or ModelContextProtocol.McpException)
-                { /* A broken/malformed client session must not kill the listener. */ }
-                finally { if (pipe.IsConnected) pipe.Disconnect(); }
             }
         }
         catch (Exception) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception)
         {
-            IsRunning = false;
+            _isRunning = false;
+            _shutdown!.Cancel();
+            Session[] active;
+            lock (_sessionGate) active = _sessions.ToArray();
+            foreach (var session in active) session.Pipe.Dispose();
             StoppedUnexpectedly?.Invoke();
+        }
+        finally
+        {
+            listener.Dispose();
+            if (ownsSlot) _slots.Release();
+        }
+    }
+
+    private async Task RunSessionAsync(Session session, DateTimeOffset sqlTestedAt, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var server = McpServer.Create(new StreamServerTransport(session.Pipe, session.Pipe), new McpServerOptions
+            {
+                ToolCollection = [McpServerTool.Create(() => new
+                {
+                    service = "SQL Server DevLens MCP", status = "running", transport = "desktop-pipe",
+                    sqlConfigured = false, sqlConnected = false, lastSqlTestSucceeded = true, lastSqlTestUtc = sqlTestedAt,
+                    postmanImplemented = false,
+                    message = "SQL connection was tested at the recorded time and disposed. Status tool only; no live SQL session or inspection tools."
+                }, new() { Name = "get_server_status", Description = "Returns the desktop-controlled MCP server status and last SQL test time; does not query SQL." })]
+            });
+            await server.RunAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception)
+        { /* A disconnected or malformed client is isolated to its own session. */ }
+        finally
+        {
+            session.Pipe.Dispose();
+            _slots.Release();
+            lock (_sessionGate) _sessions.Remove(session);
         }
     }
 
@@ -85,30 +130,30 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
         try
         {
             if (_shutdown is null) return;
+            _isRunning = false;
             _shutdown.Cancel();
-            _pipe?.Dispose();
-            if (_loop is not null) await _loop;
-            _shutdown.Dispose(); _shutdown = null; _pipe = null; _loop = null;
-            IsRunning = false;
+            NamedPipeServerStream? listener;
+            Session[] active;
+            lock (_sessionGate)
+            {
+                listener = _listener;
+                active = _sessions.ToArray();
+            }
+            listener?.Dispose();
+            foreach (var session in active) session.Pipe.Dispose();
+            if (_acceptLoop is not null) await _acceptLoop.ConfigureAwait(false);
+            Task[] pending;
+            lock (_sessionGate) pending = _sessions.Select(session => session.Completion).ToArray();
+            await Task.WhenAll(pending).ConfigureAwait(false);
+            _shutdown.Dispose(); _shutdown = null; _listener = null; _acceptLoop = null;
         }
         finally { _lifecycle.Release(); }
     }
     public async ValueTask DisposeAsync() => await StopAsync();
 
-    private sealed class LeaveOpenStream(Stream stream) : Stream
+    private sealed class Session(NamedPipeServerStream pipe)
     {
-        public override bool CanRead => stream.CanRead;
-        public override bool CanWrite => stream.CanWrite;
-        public override bool CanSeek => false;
-        public override long Length => throw new NotSupportedException();
-        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
-        public override void Flush() => stream.Flush();
-        public override Task FlushAsync(CancellationToken cancellationToken) => stream.FlushAsync(cancellationToken);
-        public override int Read(byte[] buffer, int offset, int count) => stream.Read(buffer, offset, count);
-        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) => stream.ReadAsync(buffer, cancellationToken);
-        public override void Write(byte[] buffer, int offset, int count) => stream.Write(buffer, offset, count);
-        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) => stream.WriteAsync(buffer, cancellationToken);
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-        public override void SetLength(long value) => throw new NotSupportedException();
+        public NamedPipeServerStream Pipe { get; } = pipe;
+        public Task Completion { get; set; } = Task.CompletedTask;
     }
 }

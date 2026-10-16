@@ -141,7 +141,7 @@
                             <TextBlock Text="{Binding ConnectionSummary}" TextWrapping="Wrap" />
                             <TextBlock Text="{Binding ConnectionNotice}" TextWrapping="Wrap" FontSize="12" />
                             <TextBlock Text="SQL was tested successfully and the connection closed. This MCP server currently offers get_server_status only; SQL inspection and Postman tools are planned." TextWrapping="Wrap" />
-                            <TextBlock Text="Keep this window open. Enable the updated DevLens local plugin to connect. One client session is supported at a time. Stop disconnects the client; reconnect the plugin after starting again." TextWrapping="Wrap" />
+                            <TextBlock Text="Keep this window open. Enable the updated DevLens local plugin to connect. Discovery and chat clients can connect simultaneously (up to 16 sessions). Stop disconnects every client; reconnect the plugin after starting again." TextWrapping="Wrap" />
                             <Button Content="Stop MCP server" Command="{Binding StopCommand}" IsEnabled="{Binding CanStop}" Background="#B91C1C" Foreground="White" />
                         </StackPanel>
                         <Button Content="Back to connection setup" Command="{Binding ReturnToConnectionCommand}" IsEnabled="{Binding Server.CanReturn}" />
