@@ -124,7 +124,12 @@ public class ConcurrentServerTests
         await using var chat = await ConnectAdapter();
         await Task.WhenAll(AssertStatus(discovery, timeout.Token), AssertStatus(chat, timeout.Token));
         await server.StopAsync();
-        await Assert.ThrowsAnyAsync<Exception>(async () => await discovery.CallToolAsync("get_server_status", cancellationToken: timeout.Token));
-        await Assert.ThrowsAnyAsync<Exception>(async () => await chat.CallToolAsync("get_server_status", cancellationToken: timeout.Token));
+        var offlineResults = await Task.WhenAll(
+            discovery.CallToolAsync("get_server_status", cancellationToken: timeout.Token).AsTask(),
+            chat.CallToolAsync("get_server_status", cancellationToken: timeout.Token).AsTask());
+        foreach (var result in offlineResults)
+            Assert.Contains("desktop_unavailable", Assert.IsType<TextContentBlock>(result.Content[0]).Text);
+        await server.StartAsync(DateTimeOffset.UtcNow);
+        await Task.WhenAll(AssertStatus(discovery, timeout.Token), AssertStatus(chat, timeout.Token));
     }
 }

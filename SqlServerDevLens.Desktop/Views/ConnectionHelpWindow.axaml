@@ -20,14 +20,14 @@
                 <TextBlock Text="2. Prepare the local plugin (once)" FontSize="17" FontWeight="SemiBold" />
                 <TextBlock Text="For this source-code release, follow the README's Test the local MCP plugin instructions. They publish the server files and register/install the DevLens Local marketplace. If your developer already installed the plugin, continue to step 3." TextWrapping="Wrap" />
                 <TextBlock Text="3. Enable SQL Server DevLens" FontSize="17" FontWeight="SemiBold" />
-                <TextBlock Text="In the ChatGPT desktop app, use a chat running on this computer in Work or Codex. Install or enable SQL Server DevLens from DevLens Local when available. After first installation or a plugin update, fully restart ChatGPT Desktop. Keep DevLens running." TextWrapping="Wrap" />
+                <TextBlock Text="In the ChatGPT desktop app, use a chat running on this computer in Work or Codex. Install or enable SQL Server DevLens from DevLens Local when available. After first installation or a plugin update, fully restart ChatGPT Desktop. After installation, the updated plugin can stay connected even while DevLens is stopped." TextWrapping="Wrap" />
                 <TextBlock Text="4. Check the connection" FontSize="17" FontWeight="SemiBold" />
                 <Border Background="#192941" CornerRadius="8" Padding="14">
                     <SelectableTextBlock Text="Call get_server_status from SQL Server DevLens." TextWrapping="Wrap" Foreground="#7DD3FC" />
                 </Border>
                 <TextBlock Text="The response should say running and lastSqlTestSucceeded: true. sqlConnected: false is expected: the SQL test connection was closed. Only the status tool is available today; SQL inspection and Postman are planned." TextWrapping="Wrap" />
                 <TextBlock Text="If the tool is missing" FontSize="17" FontWeight="SemiBold" />
-                <TextBlock Text="Confirm DevLens is Running and the plugin is installed/enabled. After changing DevLens code, rebuild and restart DevLens, then test SQL again. Reconnect the plugin after stopping the server. Never put SQL passwords in a chat, plugin configuration or JSON file." TextWrapping="Wrap" />
+                <TextBlock Text="Confirm DevLens is Running and the plugin is installed/enabled. After changing DevLens code, rebuild and restart DevLens, then test SQL again. With plugin 0.3.4 or newer, desktop_unavailable means start DevLens, test SQL until Running and ask for status again. The next call reconnects automatically; no ChatGPT restart is needed for a DevLens restart. Never put SQL passwords in a chat, plugin configuration or JSON file." TextWrapping="Wrap" />
                 <StackPanel Orientation="Horizontal" Spacing="12">
                     <Button Content="Project README" Click="Readme_Click" />
                     <Button Content="OpenAI plan details" Click="Plans_Click" />

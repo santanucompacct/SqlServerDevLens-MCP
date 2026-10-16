@@ -1,4 +1,3 @@
-using System.IO.Pipelines;
 using System.IO.Pipes;
 using PipeOptions = System.IO.Pipes.PipeOptions;
 using System.Text.Json;
@@ -50,23 +49,23 @@ public class ServerTests
     }
 
     [Fact]
-    public async Task StdioBridgeForwardsRealProtocolAndEndsWhenStopped()
+    public async Task DesktopStatusClientRecoversWithoutCachingThePreviousResult()
     {
         var name = "dvt-" + Guid.NewGuid().ToString("N");
         await using var server = new DesktopMcpServer(name);
-        await server.StartAsync(DateTimeOffset.UtcNow);
+        var statusClient = new DesktopStatusClient(name, TimeSpan.FromSeconds(1));
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        var incoming = new Pipe(); var outgoing = new Pipe();
-        var bridge = DesktopBridge.RunAsync(incoming.Reader.AsStream(), outgoing.Writer.AsStream(), name, timeout.Token);
-        await using var client = await McpClient.CreateAsync(new StreamClientTransport(incoming.Writer.AsStream(), outgoing.Reader.AsStream()), cancellationToken: timeout.Token);
-        var result = await client.CallToolAsync("get_server_status", cancellationToken: timeout.Token);
-        Assert.NotEmpty(result.Content);
+        var offline = await statusClient.GetStatusAsync(timeout.Token);
+        Assert.Contains("desktop_unavailable", Assert.IsType<TextContentBlock>(offline.Content[0]).Text);
+        await server.StartAsync(DateTimeOffset.UtcNow);
+        var running = await statusClient.GetStatusAsync(timeout.Token);
+        Assert.Equal("running", JsonDocument.Parse(Assert.IsType<TextContentBlock>(running.Content[0]).Text).RootElement.GetProperty("status").GetString());
         await server.StopAsync();
-        await bridge.WaitAsync(timeout.Token);
+        var stopped = await statusClient.GetStatusAsync(timeout.Token);
+        Assert.Contains("desktop_unavailable", Assert.IsType<TextContentBlock>(stopped.Content[0]).Text);
     }
-
     [Fact]
-    public async Task CompiledAdapterProcessConnectsAndCallsFailOnStop()
+    public async Task CompiledAdapterProcessStaysAvailableWhenDesktopStops()
     {
         var name = "dvt-" + Guid.NewGuid().ToString("N");
         await using var server = new DesktopMcpServer(name);
@@ -85,7 +84,8 @@ public class ServerTests
         var result = await client.CallToolAsync("get_server_status", cancellationToken: timeout.Token);
         Assert.NotEmpty(result.Content);
         await server.StopAsync();
-        await Assert.ThrowsAnyAsync<Exception>(async () => await client.CallToolAsync("get_server_status", cancellationToken: timeout.Token));
+        var stopped = await client.CallToolAsync("get_server_status", cancellationToken: timeout.Token);
+        Assert.Contains("desktop_unavailable", Assert.IsType<TextContentBlock>(stopped.Content[0]).Text);
     }
 
     [Fact]

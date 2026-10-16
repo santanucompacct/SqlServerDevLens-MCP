@@ -24,7 +24,7 @@ public partial class MainWindow : Window
             try
             {
                 var message = model.Server.IsRunning
-                    ? "Closing DevLens will stop the MCP server and disconnect all ChatGPT clients. Do you want to close the application?"
+                    ? "Closing DevLens will stop the desktop MCP server. The updated ChatGPT plugin stays available and reports desktop unavailable until DevLens runs again. Do you want to close the application?"
                     : "Do you want to close SQL Server DevLens?";
                 if (!await ConfirmAsync("Close DevLens?", message, "Close application")) return;
                 await model.ShutdownAsync();
@@ -45,7 +45,7 @@ public partial class MainWindow : Window
         try
         {
             if (await ConfirmAsync("Stop MCP server?",
-                "This will disconnect every connected ChatGPT client. DevLens will remain open, and you can test the SQL connection again to restart the server.", "Stop server"))
+                "This will disconnect every desktop MCP session. The updated ChatGPT plugin stays available and reconnects on its next status call after you test SQL and restart the server. DevLens will remain open.", "Stop server"))
                 await model.Server.StopAsync();
         }
         finally { _actionInProgress = false; }

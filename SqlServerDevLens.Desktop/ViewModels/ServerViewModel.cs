@@ -51,7 +51,7 @@ public partial class ServerViewModel : ViewModelBase
     public async Task StopAsync()
     {
         IsBusy = true;
-        try { await _server.StopAsync(); IsRunning = false; Status = "Stopped — MCP clients have been disconnected."; }
+        try { await _server.StopAsync(); IsRunning = false; Status = "Stopped — desktop sessions closed. The updated ChatGPT plugin reconnects on its next status call after DevLens starts again."; }
         finally { IsBusy = false; }
     }
 }

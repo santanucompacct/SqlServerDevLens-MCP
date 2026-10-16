@@ -1,6 +1,6 @@
 {
   "name": "sql-server-devlens",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Desktop-controlled SQL Server DevLens MCP status server. SQL inspection and Postman are planned.",
   "mcpServers": "./mcp.json",
   "interface": {
