@@ -1,0 +1,13 @@
+{
+  "name": "sql-server-devlens",
+  "version": "0.3.1",
+  "description": "Desktop-controlled SQL Server DevLens MCP status server. SQL inspection and Postman are planned.",
+  "mcpServers": "./mcp.json",
+  "interface": {
+    "displayName": "SQL Server DevLens",
+    "shortDescription": "Local SQL MCP server status",
+    "developerName": "Santanu Das",
+    "category": "Productivity",
+    "defaultPrompt": "Call get_server_status from SQL Server DevLens."
+  }
+}

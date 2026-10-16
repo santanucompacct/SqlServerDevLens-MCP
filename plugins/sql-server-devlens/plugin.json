@@ -1,5 +1,5 @@
 {
   "name": "sql-server-devlens",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Desktop-controlled SQL Server DevLens MCP status server. Start after a successful SQL test; stop from DevLens. SQL inspection and Postman are planned."
 }
