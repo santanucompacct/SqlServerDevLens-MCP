@@ -6,7 +6,7 @@ SQL Server DevLens MCP is an open-source, cross-platform .NET project aiming to 
 
 The goal is a developer-friendly desktop application: choose an operating mode, enter SQL Server connection details (similar to SQL Server Management Studio), and expose approved SQL inspection and, optionally, API testing tools to an MCP-compatible client.
 
-> **Project status: early development / initial scaffold.** The repository currently contains a running Avalonia desktop application template targeting .NET 10. SQL connectivity, the MCP server, Postman integration, and automated testing **are planned and are not implemented yet**.
+> **Project status: early development / startup UI implemented.** The repository currently contains an Avalonia desktop application targeting .NET 10 with a working two-mode startup screen and navigation to a connection-setup placeholder. SQL connectivity, the MCP server, Postman integration, and automated testing **are planned and are not implemented yet**.
 
 ## Planned features
 
@@ -64,7 +64,7 @@ dotnet restore SqlServerDevLens.slnx
 dotnet run --project SqlServerDevLens.Desktop/SqlServerDevLens.Desktop.csproj
 ```
 
-**Expected result today:** the default Avalonia welcome window opens. Database login and MCP functionality will be added in future milestones.
+**Expected result today:** the SQL Server DevLens startup screen opens with two options: **SQL Server Only** (default) or **SQL Server + Postman**. Selecting a mode and clicking **Continue** shows a connection-setup placeholder; **Back** returns to the mode selector. Database login and MCP functionality are not implemented yet.
 
 You can also open `SqlServerDevLens.slnx` in Visual Studio 2026, set `SqlServerDevLens.Desktop` as the startup project, and press **F5**.
 
@@ -72,7 +72,7 @@ You can also open `SqlServerDevLens.slnx` in Visual Studio 2026, set `SqlServerD
 
 ```text
 SqlServerDevLens-MCP/
-├── SqlServerDevLens.Desktop/   # Avalonia desktop app (implemented scaffold)
+├── SqlServerDevLens.Desktop/   # Avalonia desktop app and functional startup screen
 ├── SqlServerDevLens.slnx       # .NET solution
 ├── README.md
 └── LICENSE.txt
@@ -83,7 +83,8 @@ Planned future modules include a shared core/configuration library, SQL inspecti
 ## Roadmap
 
 - [x] Create the public MIT-licensed repository and runnable Avalonia/.NET 10 starter application.
-- [ ] **v0.1** — Operating mode selection and single-database connection manager.
+- [x] **v0.1 (part 1)** — Startup mode selection and Continue/Back navigation.
+- [ ] **v0.1 (part 2)** — Single-database SQL Server connection manager.
 - [ ] **v0.2** — Read-only SQL metadata tools and MCP integration.
 - [ ] **v0.3** — Optional Postman collection management.
 - [ ] **v0.4** — API execution, response assertions, and database verification.
