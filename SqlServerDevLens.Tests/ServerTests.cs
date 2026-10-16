@@ -53,8 +53,10 @@ public class ServerTests
     {
         var name = "dvt-" + Guid.NewGuid().ToString("N");
         await using var server = new DesktopMcpServer(name);
-        var statusClient = new DesktopStatusClient(name, TimeSpan.FromSeconds(1));
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        // Use the production request budget; initial SDK/JIT startup on hosted
+        // Windows runners can exceed the shorter timeout used by timeout-only tests.
+        var statusClient = new DesktopStatusClient(name);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(25));
         var offline = await statusClient.GetStatusAsync(timeout.Token);
         Assert.Contains("desktop_unavailable", Assert.IsType<TextContentBlock>(offline.Content[0]).Text);
         await server.StartAsync(DateTimeOffset.UtcNow);
