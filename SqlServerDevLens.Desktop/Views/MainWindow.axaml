@@ -44,7 +44,7 @@
 
                 <Border Background="#111C30" BorderBrush="#2B3B54"
                         BorderThickness="1" CornerRadius="18" Padding="30">
-
+                    <Grid>
                     <StackPanel IsVisible="{Binding IsChoosingMode}" Spacing="24">
                         <StackPanel Spacing="8">
                             <TextBlock Text="Choose your operating mode"
@@ -136,6 +136,7 @@
                                 HorizontalContentAlignment="Center"
                                 FontSize="15" Padding="18,13" />
                     </StackPanel>
+                    </Grid>
                 </Border>
 
                 <TextBlock Text="Open source · .NET 10 · Avalonia UI · MCP integration in development"
