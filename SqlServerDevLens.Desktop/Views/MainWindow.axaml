@@ -3,20 +3,146 @@
         xmlns:vm="using:SqlServerDevLens.Desktop.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d"
+        d:DesignWidth="880" d:DesignHeight="680"
         x:Class="SqlServerDevLens.Desktop.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Icon="/Assets/avalonia-logo.ico"
-        Title="SqlServerDevLens.Desktop">
+        Title="SQL Server DevLens MCP"
+        Width="880" Height="680"
+        MinWidth="680" MinHeight="570"
+        WindowStartupLocation="CenterScreen"
+        RequestedThemeVariant="Dark"
+        Background="#0B1220">
 
     <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
         <vm:MainViewModel />
     </Design.DataContext>
 
-    <TextBox Text="{Binding Greeting}"
-             HorizontalAlignment="Center"
-             VerticalAlignment="Center" />
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <Border MaxWidth="790" HorizontalAlignment="Center"
+                Margin="32" Padding="0">
+            <StackPanel Spacing="24">
+                <!-- App identity -->
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                    <Border Width="64" Height="64" CornerRadius="16"
+                            Background="#2563EB">
+                        <TextBlock Text="SQL" FontSize="19" FontWeight="Bold"
+                                   Foreground="White"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="5"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="SQL Server DevLens MCP"
+                                   FontSize="27" FontWeight="Bold"
+                                   Foreground="#F8FAFC" />
+                        <TextBlock Text="Your SQL Server, understood by AI."
+                                   FontSize="14" Foreground="#94A3B8" />
+                    </StackPanel>
+                </Grid>
 
+                <Border Background="#111C30" BorderBrush="#2B3B54"
+                        BorderThickness="1" CornerRadius="18" Padding="30">
+
+                    <StackPanel IsVisible="{Binding IsChoosingMode}" Spacing="24">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Choose your operating mode"
+                                       FontSize="22" FontWeight="SemiBold"
+                                       Foreground="#F8FAFC" />
+                            <TextBlock Text="Start with SQL exploration, or enable API testing features alongside it."
+                                       FontSize="14" Foreground="#A9B8CE"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="14">
+                            <Border Background="#192941" BorderBrush="#375578"
+                                    BorderThickness="1" CornerRadius="12"
+                                    Padding="18">
+                                <RadioButton GroupName="OperatingMode"
+                                             IsChecked="{Binding IsSqlOnlySelected, Mode=TwoWay}"
+                                             VerticalAlignment="Center">
+                                    <StackPanel Margin="12,0,0,0" Spacing="7">
+                                        <TextBlock Text="SQL Server Only"
+                                                   FontSize="18" FontWeight="SemiBold"
+                                                   Foreground="#F8FAFC" />
+                                        <TextBlock Text="Inspect schemas, tables, keys, relationships, stored procedures and permitted data."
+                                                   FontSize="13" Foreground="#A9B8CE"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Text="No Postman installation required"
+                                                   FontSize="12" Foreground="#7DD3FC" />
+                                    </StackPanel>
+                                </RadioButton>
+                            </Border>
+
+                            <Border Background="#192941" BorderBrush="#375578"
+                                    BorderThickness="1" CornerRadius="12"
+                                    Padding="18">
+                                <RadioButton GroupName="OperatingMode"
+                                             IsChecked="{Binding IsSqlWithPostmanSelected, Mode=TwoWay}"
+                                             VerticalAlignment="Center">
+                                    <StackPanel Margin="12,0,0,0" Spacing="7">
+                                        <TextBlock Text="SQL Server + Postman"
+                                                   FontSize="18" FontWeight="SemiBold"
+                                                   Foreground="#F8FAFC" />
+                                        <TextBlock Text="Explore SQL Server, manage API requests and validate API responses against database results."
+                                                   FontSize="13" Foreground="#A9B8CE"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Text="Optional integration for API testing"
+                                                   FontSize="12" Foreground="#7DD3FC" />
+                                    </StackPanel>
+                                </RadioButton>
+                            </Border>
+                        </StackPanel>
+
+                        <Button Content="Continue"
+                                Command="{Binding ContinueCommand}"
+                                Background="#2563EB" Foreground="White"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center"
+                                FontSize="15" FontWeight="SemiBold"
+                                Padding="18,13" />
+                    </StackPanel>
+
+                    <!-- Navigation placeholder for the next milestone -->
+                    <StackPanel IsVisible="{Binding IsConnectionStepVisible}"
+                                Spacing="20">
+                        <TextBlock Text="Mode selected"
+                                   FontSize="14" Foreground="#7DD3FC" />
+                        <TextBlock Text="{Binding SelectedModeLabel}"
+                                   FontSize="26" FontWeight="Bold"
+                                   Foreground="#F8FAFC" />
+                        <TextBlock Text="{Binding SelectedModeDescription}"
+                                   FontSize="15" Foreground="#A9B8CE"
+                                   TextWrapping="Wrap" />
+                        <Border Background="#192941" CornerRadius="12"
+                                BorderBrush="#375578" BorderThickness="1"
+                                Padding="20">
+                            <StackPanel Spacing="9">
+                                <TextBlock Text="Next: SQL Server connection setup"
+                                           FontSize="17" FontWeight="SemiBold"
+                                           Foreground="#F8FAFC" />
+                                <TextBlock Text="The SSMS-style connection screen will be implemented next: host, port, database, authentication, encryption and credentials."
+                                           FontSize="14" Foreground="#A9B8CE"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Text="No database connection or MCP service has started yet."
+                                           FontSize="12" Foreground="#FBBF24"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                        <Button Content="Back to mode selection"
+                                Command="{Binding BackCommand}"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center"
+                                FontSize="15" Padding="18,13" />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Text="Open source · .NET 10 · Avalonia UI · MCP integration in development"
+                           FontSize="12" Foreground="#7C8BA3"
+                           TextWrapping="Wrap"
+                           HorizontalAlignment="Center" />
+            </StackPanel>
+        </Border>
+    </ScrollViewer>
 </Window>
