@@ -40,7 +40,7 @@ public partial class ServerViewModel : ViewModelBase
             Status = IsRunning ? "Running — local MCP server is available" : "Server could not start. Test the connection again.";
             if (!IsRunning) await _server.StopAsync();
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
         {
             await _server.StopAsync(); IsRunning = false;
             Status = "Could not start the MCP server. Another DevLens window may already be running, or local permissions prevent startup.";

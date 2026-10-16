@@ -16,7 +16,7 @@ public class ServerTests
     [Fact]
     public async Task RealMcpSessionReconnectStopAndRestart()
     {
-        var name = "devlens-test-" + Guid.NewGuid().ToString("N");
+        var name = "dvt-" + Guid.NewGuid().ToString("N");
         await using var server = new DesktopMcpServer(name);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         var testedAt = DateTimeOffset.UtcNow;
@@ -52,7 +52,7 @@ public class ServerTests
     [Fact]
     public async Task StdioBridgeForwardsRealProtocolAndEndsWhenStopped()
     {
-        var name = "devlens-bridge-test-" + Guid.NewGuid().ToString("N");
+        var name = "dvt-" + Guid.NewGuid().ToString("N");
         await using var server = new DesktopMcpServer(name);
         await server.StartAsync(DateTimeOffset.UtcNow);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
@@ -68,7 +68,7 @@ public class ServerTests
     [Fact]
     public async Task CompiledAdapterProcessConnectsAndCallsFailOnStop()
     {
-        var name = "devlens-process-test-" + Guid.NewGuid().ToString("N");
+        var name = "dvt-" + Guid.NewGuid().ToString("N");
         await using var server = new DesktopMcpServer(name);
         await server.StartAsync(DateTimeOffset.UtcNow);
         var root = new DirectoryInfo(AppContext.BaseDirectory);
@@ -91,7 +91,7 @@ public class ServerTests
     [Fact]
     public async Task DuplicateListenerIsRejectedAndStopIsIdempotent()
     {
-        var name = "devlens-exclusive-test-" + Guid.NewGuid().ToString("N");
+        var name = "dvt-" + Guid.NewGuid().ToString("N");
         await using var first = new DesktopMcpServer(name);
         await using var second = new DesktopMcpServer(name);
         await first.StartAsync(DateTimeOffset.UtcNow);

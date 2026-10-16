@@ -16,7 +16,8 @@ public interface IDesktopMcpServer : IAsyncDisposable
 // No TCP listener, credential file, SQL password, or persistent SQL connection.
 public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServer
 {
-    public static string DefaultPipeName => "SqlServerDevLens-" + Convert.ToHexString(
+    // Short names also fit macOS Unix-domain socket limits under its per-user temp directory.
+    public static string DefaultPipeName => "dvl-" + Convert.ToHexString(
         SHA256.HashData(Encoding.UTF8.GetBytes(Environment.UserName)))[..24];
     private readonly string _pipeName = pipeName ?? DefaultPipeName;
     private NamedPipeServerStream? _pipe;
