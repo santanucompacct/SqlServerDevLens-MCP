@@ -1,0 +1,15 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="SqlServerDevLens.Desktop.Views.ConfirmationWindow"
+        Width="470" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Icon="/Assets/devlens-owl.ico" Background="#111C30" RequestedThemeVariant="Dark">
+    <StackPanel Margin="26" Spacing="20">
+        <TextBlock x:Name="Heading" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock x:Name="Message" FontSize="14" TextWrapping="Wrap" Foreground="#CBD5E1" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+            <Button x:Name="CancelAction" Content="Cancel" IsDefault="True" IsCancel="True" Click="Cancel_Click" Padding="20,10" />
+            <Button x:Name="ConfirmAction" Click="Confirm_Click" Background="#B91C1C" Foreground="White" Padding="20,10" />
+        </StackPanel>
+    </StackPanel>
+</Window>

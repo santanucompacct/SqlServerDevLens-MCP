@@ -1,0 +1,40 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="SqlServerDevLens.Desktop.Views.ConnectionHelpWindow"
+        Title="Connect DevLens to ChatGPT Desktop"
+        Icon="/Assets/devlens-owl.ico" Width="620" Height="660"
+        MinWidth="440" MinHeight="420" WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False" Background="#0B1220" RequestedThemeVariant="Dark">
+    <Grid RowDefinitions="*,Auto" Margin="24">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="15" Margin="0,0,12,16">
+                <TextBlock Text="First-time connection guide" FontSize="24" FontWeight="Bold" TextWrapping="Wrap" />
+                <Border Background="#192941" CornerRadius="10" Padding="16">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Supported setup: ChatGPT Plus or higher" FontWeight="SemiBold" TextWrapping="Wrap" Foreground="#7DD3FC" />
+                        <TextBlock Text="Use the current ChatGPT desktop app on the same computer, signed in to an account with local Work/Codex and local-plugin access. Plus or higher is the supported setup for this DevLens guide, not a universal OpenAI minimum. Available plans and features can change; check your account before subscribing." TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+                <TextBlock Text="1. Start DevLens" FontSize="17" FontWeight="SemiBold" />
+                <TextBlock Text="Choose a mode, enter your SQL Server details and select Test Connection. After a successful test, leave the MCP server screen showing Running." TextWrapping="Wrap" />
+                <TextBlock Text="2. Prepare the local plugin (once)" FontSize="17" FontWeight="SemiBold" />
+                <TextBlock Text="For this source-code release, follow the README's Test the local MCP plugin instructions. They publish the server files and register/install the DevLens Local marketplace. If your developer already installed the plugin, continue to step 3." TextWrapping="Wrap" />
+                <TextBlock Text="3. Enable SQL Server DevLens" FontSize="17" FontWeight="SemiBold" />
+                <TextBlock Text="In the ChatGPT desktop app, use a chat running on this computer in Work or Codex. Install or enable SQL Server DevLens from DevLens Local when available. After first installation or a plugin update, fully restart ChatGPT Desktop. Keep DevLens running." TextWrapping="Wrap" />
+                <TextBlock Text="4. Check the connection" FontSize="17" FontWeight="SemiBold" />
+                <Border Background="#192941" CornerRadius="8" Padding="14">
+                    <SelectableTextBlock Text="Call get_server_status from SQL Server DevLens." TextWrapping="Wrap" Foreground="#7DD3FC" />
+                </Border>
+                <TextBlock Text="The response should say running and lastSqlTestSucceeded: true. sqlConnected: false is expected: the SQL test connection was closed. Only the status tool is available today; SQL inspection and Postman are planned." TextWrapping="Wrap" />
+                <TextBlock Text="If the tool is missing" FontSize="17" FontWeight="SemiBold" />
+                <TextBlock Text="Confirm DevLens is Running and the plugin is installed/enabled. After changing DevLens code, rebuild and restart DevLens, then test SQL again. Reconnect the plugin after stopping the server. Never put SQL passwords in a chat, plugin configuration or JSON file." TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button Content="Project README" Click="Readme_Click" />
+                    <Button Content="OpenAI plan details" Click="Plans_Click" />
+                </StackPanel>
+                <TextBlock x:Name="LinkStatus" TextWrapping="Wrap" Foreground="#FBBF24" />
+            </StackPanel>
+        </ScrollViewer>
+        <Button Grid.Row="1" Content="Got it" HorizontalAlignment="Right" IsDefault="True" IsCancel="True" Click="Close_Click" Padding="24,10" />
+    </Grid>
+</Window>
