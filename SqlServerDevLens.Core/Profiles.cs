@@ -10,7 +10,7 @@ public interface ICredentialStore
     Task DeleteAsync(string profileId, CancellationToken cancellationToken = default);
 }
 
-// Fails closed until Windows Credential Manager / macOS Keychain / Linux Secret Service adapters exist.
+// Fails closed on platforms without a secure credential adapter.
 public sealed class UnavailableCredentialStore : ICredentialStore
 {
     public bool IsAvailable => false;

@@ -8,11 +8,11 @@ The two-mode startup screen now opens a SQL Server login form: TCP host, port (1
 
 Remember profile saves only connection metadata after a successful test. Profiles live in `Environment.SpecialFolder.LocalApplicationData/SqlServerDevLens/connections.json`, outside the repository. **Host, database and username are not encrypted**; use only an appropriate OS account/location. Forget saved profile removes it immediately. Leaving Remember profile unchecked removes a previous profile after a successful test. Password is cleared after every test and when returning to mode selection.
 
-Remember password is visibly disabled. The core includes an `ICredentialStore` boundary with a fail-closed implementation; Windows Credential Manager, macOS Keychain and Linux Secret Service adapters are staged for a later milestone. There is no plaintext-password fallback. Passwords are briefly held as managed strings in memory and cannot be guaranteed zeroed by .NET.
+On Windows, check **Remember profile** and **Remember password securely**, then run a successful Test Connection. The password is saved in Windows Credential Manager for the current Windows user on this computer, and reloaded when you reopen connection setup. The JSON profile never contains it. Changing connection identity or TLS settings clears the filled password. Unchecking password remembering removes the previously saved secret after the next successful test; **Forget saved profile** removes both immediately. A failed SQL test preserves the previously saved profile/credential. If secure storage fails, the UI reports that persistence was incomplete and never falls back to JSON. Windows applications running as the same user may access generic credentials; this is not protection from a compromised Windows account. macOS Keychain and Linux Secret Service adapters remain planned, with password remembering disabled on those platforms. Passwords are briefly held as managed strings in memory and cannot be guaranteed zeroed by .NET.
 
 The separate official C# SDK MCP host exposes **only `get_server_status`**. It reports transport readiness and explicitly reports SQL as unconfigured/disconnected. It neither reads desktop profiles nor shares the desktop's test results. All host logs go to stderr; stdout is reserved for MCP JSON messages.
 
-**Postman integration remains planned**, including when SQL Server + Postman is selected. SQL metadata/data tools, desktop-to-host configuration, secure password persistence and distributable cross-platform installers are not implemented.
+**Postman integration remains planned**, including when SQL Server + Postman is selected. SQL metadata/data tools, desktop-to-host configuration, macOS/Linux secure password persistence and distributable cross-platform installers are not implemented.
 
 ## Pull and run in Visual Studio 2026
 
@@ -58,7 +58,7 @@ These steps follow the official [local plugin packaging/marketplace guide](https
 
 ## Validation and boundaries
 
-Verified locally on Windows with .NET SDK 10.0.402: restore; Release solution build with zero warnings/errors; five core tests covering validation, safe connection-string construction, integrated-auth credential omission, profile round trip/deletion, and unavailable secure storage; real stdio initialize/list/call smoke test. No real SQL Server connection or ChatGPT Desktop installation has been verified. The UI compiles, but visual/interactive QA is pending.
+Verified locally on Windows with .NET SDK 10.0.402: restore; Release solution build with zero warnings/errors; core safety tests plus password opt-in/reload/forget, opt-out, failed SQL and credential-store failure tests; a Windows-only native credential create/read/update/delete test uses a unique fake secret and cleans it up; real stdio initialize/list/call smoke test. No real SQL Server connection or ChatGPT Desktop installation has been verified. The UI compiles, but visual/interactive QA is pending.
 
 GitHub Actions runs restore/build/tests and the stdio smoke script on Windows, Ubuntu and macOS. Results must be checked on the PR before claiming those platforms pass. CI does not contact a SQL Server.
 
@@ -71,6 +71,6 @@ GitHub Actions runs restore/build/tests and the stdio smoke script on Windows, U
 - `plugins/`, `.agents/plugins/`: local plugin package and marketplace.
 - `scripts/Test-Mcp.ps1`: protocol smoke test.
 
-Next: verified SQL integration tests and UI QA; OS credential adapters; explicit desktop-to-host profile selection; controlled read-only metadata tools; optional Postman work later. Use least-privileged SQL accounts and enforce database access in SQL Server. Never commit credentials, customer data, local profiles or tokens. There is no unrestricted SQL execution tool.
+Next: verified SQL integration tests and UI QA; macOS/Linux credential adapters; explicit desktop-to-host profile selection; controlled read-only metadata tools; optional Postman work later. Use least-privileged SQL accounts and enforce database access in SQL Server. Never commit credentials, customer data, local profiles or tokens. There is no unrestricted SQL execution tool.
 
 Licensed under [MIT](LICENSE.txt). Third-party tools retain their own licenses.

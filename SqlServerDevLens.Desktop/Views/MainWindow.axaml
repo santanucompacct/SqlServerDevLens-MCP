@@ -125,7 +125,8 @@
                                 <CheckBox Content="Encrypt connection" IsChecked="{Binding Encrypt}" />
                                 <CheckBox Content="Trust server certificate (skips certificate validation)" IsChecked="{Binding TrustServerCertificate}" />
                                 <CheckBox Content="Remember profile after a successful test (no password)" IsChecked="{Binding RememberProfile}" />
-                                <CheckBox Content="Remember password — secure OS storage coming later" IsEnabled="{Binding CanRememberPassword}" />
+                                <CheckBox Content="Remember password securely" IsChecked="{Binding RememberPassword}" IsEnabled="{Binding CanRememberPassword}" />
+                                <TextBlock Text="{Binding PasswordStorageHint}" TextWrapping="Wrap" FontSize="12" />
                                 <Button Content="Forget saved profile" Command="{Binding ForgetProfileCommand}" />
                                 <Button Content="Test Connection" Command="{Binding TestConnectionCommand}" Background="#2563EB" />
                             </StackPanel>
