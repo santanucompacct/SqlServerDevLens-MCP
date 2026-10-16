@@ -1,116 +1,76 @@
 # SQL Server DevLens MCP
 
-**Your SQL Server, understood by AI.**
+**Your SQL Server, understood by AI.** An MIT-licensed .NET 10 / Avalonia desktop application with owl branding.
 
-SQL Server DevLens MCP is an open-source, cross-platform .NET project aiming to help developers inspect Microsoft SQL Server databases and validate API behavior with AI assistants through the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/).
+## Current milestone
 
-The goal is a developer-friendly desktop application: choose an operating mode, enter SQL Server connection details (similar to SQL Server Management Studio), and expose approved SQL inspection and, optionally, API testing tools to an MCP-compatible client.
+The two-mode startup screen now opens a SQL Server login form: TCP host, port (1433), one required database, SQL authentication or Windows integrated authentication, SQL username/password, encryption (on), and trust-server-certificate (off). Test Connection uses Microsoft.Data.SqlClient and opens/disposes a connection per attempt. It does not maintain a session or execute inspection queries. Provider errors are reduced to safe messages/error numbers, without displaying passwords or connection strings.
 
-> **Project status: early development / startup UI implemented.** The repository currently contains an Avalonia desktop application targeting .NET 10 with a working two-mode startup screen and navigation to a connection-setup placeholder. SQL connectivity, the MCP server, Postman integration, and automated testing **are planned and are not implemented yet**.
+Remember profile saves only connection metadata after a successful test. Profiles live in `Environment.SpecialFolder.LocalApplicationData/SqlServerDevLens/connections.json`, outside the repository. **Host, database and username are not encrypted**; use only an appropriate OS account/location. Forget saved profile removes it immediately. Leaving Remember profile unchecked removes a previous profile after a successful test. Password is cleared after every test and when returning to mode selection.
 
-## Planned features
+Remember password is visibly disabled. The core includes an `ICredentialStore` boundary with a fail-closed implementation; Windows Credential Manager, macOS Keychain and Linux Secret Service adapters are staged for a later milestone. There is no plaintext-password fallback. Passwords are briefly held as managed strings in memory and cannot be guaranteed zeroed by .NET.
 
-### SQL Server Only
+The separate official C# SDK MCP host exposes **only `get_server_status`**. It reports transport readiness and explicitly reports SQL as unconfigured/disconnected. It neither reads desktop profiles nor shares the desktop's test results. All host logs go to stderr; stdout is reserved for MCP JSON messages.
 
-- SSMS-style connection setup: host, port (default 1433), **one required database name**, authentication, TLS encryption, and certificate-trust settings.
-- Reusable saved connection profiles, with credentials stored securely outside configuration JSON.
-- Inspect tables, columns, keys, relationships, indexes, and stored procedure definitions.
-- Search database objects and retrieve limited, authorized sample data.
-- Expose controlled, **read-only-by-default** SQL exploration tools through MCP.
-- Open SQL connections per operation and dispose of them afterward, using standard ADO.NET connection pooling.
+**Postman integration remains planned**, including when SQL Server + Postman is selected. SQL metadata/data tools, desktop-to-host configuration, secure password persistence and distributable cross-platform installers are not implemented.
 
-### SQL Server + Postman (optional)
+## Pull and run in Visual Studio 2026
 
-- Reuse all SQL inspection functionality.
-- Work with existing Postman collections and add or update requests containing sample JSON and headers.
-- Optionally integrate with Postman CLI or compatible local collection runners.
-- Run approved API tests against explicitly configured **test environments**.
-- Verify API responses **and** expected database state changes using deterministic assertions.
-- Produce combined API/database test results for debugging and frontend handoff.
+Install Visual Studio 2026 with .NET desktop development and a .NET 10 SDK. Avalonia packages restore from NuGet; a paid extension is not required. From your existing clone:
 
-The two modes will share **one MCP server** with separately organized tools. The SQL-only mode will not require Postman.
-
-## Technology
-
-| Area | Technology |
-| --- | --- |
-| Language | C# |
-| Framework | .NET 10 |
-| Desktop UI | Avalonia UI (currently 12.1.4) |
-| Architecture | MVVM with CommunityToolkit.Mvvm |
-| SQL access (planned) | Microsoft.Data.SqlClient |
-| MCP (planned) | Official C# MCP SDK |
-| Postman (planned, optional) | Postman collection integration and CLI / compatible runner |
-| Target platforms | Windows, macOS, and Linux |
-| License | MIT |
-
-Avalonia supports cross-platform desktop development. Platform-specific builds and packaging will be addressed as the project matures.
-
-## Getting started (current scaffold)
-
-### Prerequisites
-
-- [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
-- A supported .NET development environment, such as Visual Studio 2026 or a compatible editor
-
-The Avalonia dependencies are restored automatically through NuGet. You do **not** need a paid Avalonia extension to build this project.
-
-### Clone and run
-
-```bash
-git clone https://github.com/santanucompacct/SqlServerDevLens-MCP.git
-cd SqlServerDevLens-MCP
+```powershell
+git fetch origin
+git switch feature/sql-login-mcp-status
+git pull --ff-only origin feature/sql-login-mcp-status
 dotnet restore SqlServerDevLens.slnx
-dotnet run --project SqlServerDevLens.Desktop/SqlServerDevLens.Desktop.csproj
+dotnet build SqlServerDevLens.slnx -c Release
+dotnet test SqlServerDevLens.slnx -c Release --no-build
 ```
 
-**Expected result today:** the SQL Server DevLens startup screen opens with two options: **SQL Server Only** (default) or **SQL Server + Postman**. Selecting a mode and clicking **Continue** shows a connection-setup placeholder; **Back** returns to the mode selector. Database login and MCP functionality are not implemented yet.
+For a new clone, first run `git clone https://github.com/santanucompacct/SqlServerDevLens-MCP.git` and enter the cloned directory. After the PR is merged, use `master` instead of the feature branch.
 
-You can also open `SqlServerDevLens.slnx` in Visual Studio 2026, set `SqlServerDevLens.Desktop` as the startup project, and press **F5**.
+Open `SqlServerDevLens.slnx` in Visual Studio 2026. Set `SqlServerDevLens.Desktop` as the startup project, then press F5. Choose either mode and Continue. Enter a TCP host/IP, port and a single database. Named instances must be resolved to their TCP port; do not enter a connection string or `server\instance` in Host. SQL authentication is the default; check Windows authentication to use the current process identity. On macOS/Linux integrated authentication requires correctly configured Kerberos and is not equivalent to entering Windows credentials.
 
-## Repository structure
+Use Test Connection with an account authorized for the chosen database. Keep encryption enabled and certificate trust disabled with a valid server certificate. For an intentionally self-signed test server, choosing Trust server certificate bypasses certificate validation. A success means only that SqlClient opened the selected database; no SQL tool or MCP connection was established. Test wrong credentials, invalid database, unreachable port, and certificate failure on your own test server. Do not paste credentials into chats, JSON, command arguments or source files.
 
-```text
-SqlServerDevLens-MCP/
-├── SqlServerDevLens.Desktop/   # Avalonia desktop app and functional startup screen
-├── SqlServerDevLens.slnx       # .NET solution
-├── README.md
-└── LICENSE.txt
+## Test the local MCP plugin
+
+From the repository root in PowerShell 7:
+
+```powershell
+dotnet build SqlServerDevLens.slnx -c Release
+./scripts/Test-Mcp.ps1
+dotnet publish SqlServerDevLens.McpHost -c Release --no-self-contained -o plugins/sql-server-devlens/server
+./scripts/Test-Mcp.ps1 -HostDll ./plugins/sql-server-devlens/server/SqlServerDevLens.McpHost.dll
 ```
 
-Planned future modules include a shared core/configuration library, SQL inspection engine, MCP host, optional Postman adapter, and API/database testing engine. These are *not yet present* in the repository.
+The smoke script launches the compiled host directly, sends initialize, tools/list and tools/call messages, checks the status response, and shuts it down. It fails on non-JSON stdout and bounds response waits. The published server directory is ignored by Git. This is a framework-dependent local package requiring .NET 10 on the target machine; do not launch through `dotnet run`, which can print build messages onto the protocol stream.
 
-## Roadmap
+The repository includes `plugins/sql-server-devlens/plugin.json`, `mcp.json`, and a repo-scoped `.agents/plugins/marketplace.json`. The MCP configuration uses `dotnet` with `${PLUGIN_ROOT}/server/SqlServerDevLens.McpHost.dll`, so the published server and dependencies must be present **before installation**.
 
-- [x] Create the public MIT-licensed repository and runnable Avalonia/.NET 10 starter application.
-- [x] **v0.1 (part 1)** — Startup mode selection and Continue/Back navigation.
-- [ ] **v0.1 (part 2)** — Single-database SQL Server connection manager.
-- [ ] **v0.2** — Read-only SQL metadata tools and MCP integration.
-- [ ] **v0.3** — Optional Postman collection management.
-- [ ] **v0.4** — API execution, response assertions, and database verification.
-- [ ] **v0.5** — Test reports and automation support.
-- [ ] **v1.0** — Cross-platform packaging, documentation, and stable release.
+1. Open this repository as a local project in the ChatGPT desktop app's Work/Codex local execution surface.
+2. Restart the desktop app to discover the repo marketplace. In Plugins Directory select **DevLens Local** and install **sql-server-devlens**. Availability depends on the account/client; absence of this source is not proof the MCP host failed.
+3. In a locally executed chat enable/mention the plugin and ask: “Call get_server_status from SQL Server DevLens and show the result.”
+4. Expect `status: ready`, `transport: stdio`, `sqlConfigured: false`, `sqlConnected: false`, `postmanImplemented: false`. A successful call verifies this client's plugin transport only.
+5. After republishing/changing plugin files, refresh/reinstall the local plugin and restart the app; installed plugins are cached copies.
 
-Roadmap items describe intended work, not shipped features or guaranteed dates. Compatibility with specific AI assistants and ChatGPT subscription tiers will be verified during integration testing.
+These steps follow the official [local plugin packaging/marketplace guide](https://developers.openai.com/plugins/build/plugins) and [stdio configuration guide](https://developers.openai.com/plugins/deploy/desktop-only). Public-directory submission is a separate approval process; this repository does not claim account eligibility or a verified ChatGPT installation. No Azure endpoint or OpenAI API key is required by this host.
 
-## Security principles
+## Validation and boundaries
 
-- Never commit SQL passwords, connection profiles containing sensitive host details, API tokens, or customer data.
-- Store passwords in an operating system credential store or other approved secure secret storage—not as plaintext in JSON.
-- Default to read-only SQL permissions and narrowly scoped metadata/data inspection tools; avoid unrestricted SQL execution.
-- Limit access to the explicitly selected database and enforce permissions at the **SQL Server account** level, not only in the UI.
-- Use encrypted connections where supported and make certificate validation explicit.
-- Keep API write tests separate from production databases. Require authorization, isolate fixtures, and validate both successful and failed transactions.
-- Restrict tool inputs, command execution, and local MCP endpoint access.
+Verified locally on Windows with .NET SDK 10.0.402: restore; Release solution build with zero warnings/errors; five core tests covering validation, safe connection-string construction, integrated-auth credential omission, profile round trip/deletion, and unavailable secure storage; real stdio initialize/list/call smoke test. No real SQL Server connection or ChatGPT Desktop installation has been verified. The UI compiles, but visual/interactive QA is pending.
 
-## Contributing
+GitHub Actions runs restore/build/tests and the stdio smoke script on Windows, Ubuntu and macOS. Results must be checked on the PR before claiming those platforms pass. CI does not contact a SQL Server.
 
-Issues, feature suggestions, documentation improvements, and pull requests are welcome. For larger changes, please open an issue first so the proposal can be discussed. Keep contributions generic and free of customer-specific code, credentials, or data.
+## Structure and next milestones
 
-## License
+- `SqlServerDevLens.Desktop`: Avalonia MVVM startup and login UI.
+- `SqlServerDevLens.Core`: connection/profile DTOs and interfaces, SqlClient tester, credential-free JSON storage.
+- `SqlServerDevLens.McpHost`: independent stdio host, status tool only.
+- `SqlServerDevLens.Tests`: core safety tests.
+- `plugins/`, `.agents/plugins/`: local plugin package and marketplace.
+- `scripts/Test-Mcp.ps1`: protocol smoke test.
 
-Licensed under the [MIT License](LICENSE.txt). Postman and other optional third-party tools remain subject to their own licenses and terms.
+Next: verified SQL integration tests and UI QA; OS credential adapters; explicit desktop-to-host profile selection; controlled read-only metadata tools; optional Postman work later. Use least-privileged SQL accounts and enforce database access in SQL Server. Never commit credentials, customer data, local profiles or tokens. There is no unrestricted SQL execution tool.
 
----
-
-Created and maintained as an open-source initiative. Follow this repository for progress as the SQL, MCP, and API testing components are developed.
+Licensed under [MIT](LICENSE.txt). Third-party tools retain their own licenses.

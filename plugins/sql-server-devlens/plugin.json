@@ -1,0 +1,5 @@
+{
+  "name": "sql-server-devlens",
+  "version": "0.2.0",
+  "description": "SQL Server DevLens local MCP transport smoke test. SQL tools and Postman are not implemented."
+}
