@@ -1,3 +1,6 @@
 <Solution>
+  <Project Path="SqlServerDevLens.Core/SqlServerDevLens.Core.csproj" />
   <Project Path="SqlServerDevLens.Desktop/SqlServerDevLens.Desktop.csproj" />
+  <Project Path="SqlServerDevLens.McpHost/SqlServerDevLens.McpHost.csproj" />
+  <Project Path="SqlServerDevLens.Tests/SqlServerDevLens.Tests.csproj" />
 </Solution>

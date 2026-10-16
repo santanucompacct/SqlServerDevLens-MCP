@@ -12,8 +12,7 @@ public enum DevLensMode
 }
 
 /// <summary>
-/// Manages the startup selection screen. Database connectivity and the
-/// MCP host will be introduced in subsequent milestones.
+/// Manages startup mode selection and navigation to connection setup.
 /// </summary>
 public class MainViewModel : ViewModelBase
 {
@@ -22,11 +21,12 @@ public class MainViewModel : ViewModelBase
 
     public MainViewModel()
     {
-        ContinueCommand = new RelayCommand(() => IsChoosingMode = false);
-        BackCommand = new RelayCommand(() => IsChoosingMode = true);
+        ContinueCommand = new AsyncRelayCommand(async () => { await Connection.LoadAsync(); IsChoosingMode = false; });
+        BackCommand = new RelayCommand(() => { Connection.Password = ""; IsChoosingMode = true; });
     }
 
-    public IRelayCommand ContinueCommand { get; }
+    public ConnectionViewModel Connection { get; } = new();
+    public IAsyncRelayCommand ContinueCommand { get; }
 
     public IRelayCommand BackCommand { get; }
 

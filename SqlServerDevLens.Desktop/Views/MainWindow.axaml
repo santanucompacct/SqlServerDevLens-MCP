@@ -102,37 +102,36 @@
                                 Padding="18,13" />
                     </StackPanel>
 
-                    <!-- Navigation placeholder for the next milestone -->
-                    <StackPanel IsVisible="{Binding IsConnectionStepVisible}"
-                                Spacing="20">
-                        <TextBlock Text="Mode selected"
-                                   FontSize="14" Foreground="#7DD3FC" />
-                        <TextBlock Text="{Binding SelectedModeLabel}"
-                                   FontSize="26" FontWeight="Bold"
-                                   Foreground="#F8FAFC" />
-                        <TextBlock Text="{Binding SelectedModeDescription}"
-                                   FontSize="15" Foreground="#A9B8CE"
-                                   TextWrapping="Wrap" />
-                        <Border Background="#192941" CornerRadius="12"
-                                BorderBrush="#375578" BorderThickness="1"
-                                Padding="20">
-                            <StackPanel Spacing="9">
-                                <TextBlock Text="Next: SQL Server connection setup"
-                                           FontSize="17" FontWeight="SemiBold"
-                                           Foreground="#F8FAFC" />
-                                <TextBlock Text="The SSMS-style connection screen will be implemented next: host, port, database, authentication, encryption and credentials."
-                                           FontSize="14" Foreground="#A9B8CE"
-                                           TextWrapping="Wrap" />
-                                <TextBlock Text="No database connection or MCP service has started yet."
-                                           FontSize="12" Foreground="#FBBF24"
-                                           TextWrapping="Wrap" />
+                    <StackPanel IsVisible="{Binding IsConnectionStepVisible}" Spacing="16">
+                        <TextBlock Text="Connect to SQL Server" FontSize="24" FontWeight="Bold" />
+                        <TextBlock Text="{Binding SelectedModeLabel}" Foreground="#7DD3FC" />
+                        <TextBlock Text="Postman integration is planned and is not active in either mode." TextWrapping="Wrap" />
+                        <StackPanel DataContext="{Binding Connection}" x:DataType="vm:ConnectionViewModel" Spacing="10">
+                            <StackPanel IsEnabled="{Binding IsEditable}" Spacing="10">
+                                <TextBlock Text="Server / host (TCP)" />
+                                <TextBox Text="{Binding Host}" PlaceholderText="localhost or server.example.com" />
+                                <TextBlock Text="Port" />
+                                <TextBox Text="{Binding Port}" />
+                                <TextBlock Text="Database (required, one database)" />
+                                <TextBox Text="{Binding Database}" />
+                                <CheckBox Content="Windows authentication (current OS identity)" IsChecked="{Binding WindowsAuthentication}" />
+                                <TextBlock Text="Otherwise use SQL Server authentication. Windows auth on macOS/Linux requires Kerberos configuration." TextWrapping="Wrap" FontSize="12" />
+                                <StackPanel IsVisible="{Binding IsSqlAuthentication}" Spacing="10">
+                                    <TextBlock Text="SQL username" />
+                                    <TextBox Text="{Binding Username}" />
+                                    <TextBlock Text="Password" />
+                                    <TextBox Text="{Binding Password}" PasswordChar="●" />
+                                </StackPanel>
+                                <CheckBox Content="Encrypt connection" IsChecked="{Binding Encrypt}" />
+                                <CheckBox Content="Trust server certificate (skips certificate validation)" IsChecked="{Binding TrustServerCertificate}" />
+                                <CheckBox Content="Remember profile after a successful test (no password)" IsChecked="{Binding RememberProfile}" />
+                                <CheckBox Content="Remember password — secure OS storage coming later" IsEnabled="{Binding CanRememberPassword}" />
+                                <Button Content="Forget saved profile" Command="{Binding ForgetProfileCommand}" />
+                                <Button Content="Test Connection" Command="{Binding TestConnectionCommand}" Background="#2563EB" />
                             </StackPanel>
-                        </Border>
-                        <Button Content="Back to mode selection"
-                                Command="{Binding BackCommand}"
-                                HorizontalAlignment="Stretch"
-                                HorizontalContentAlignment="Center"
-                                FontSize="15" Padding="18,13" />
+                            <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Foreground="#7DD3FC" />
+                        </StackPanel>
+                        <Button Content="Back to mode selection" Command="{Binding BackCommand}" IsEnabled="{Binding Connection.IsEditable}" />
                     </StackPanel>
                     </Grid>
                 </Border>

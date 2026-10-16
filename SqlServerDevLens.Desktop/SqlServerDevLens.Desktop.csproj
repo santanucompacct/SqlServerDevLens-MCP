@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <ApplicationIcon>Assets/devlens-owl.ico</ApplicationIcon>
@@ -23,4 +23,5 @@
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../SqlServerDevLens.Core/SqlServerDevLens.Core.csproj" /></ItemGroup>
 </Project>
