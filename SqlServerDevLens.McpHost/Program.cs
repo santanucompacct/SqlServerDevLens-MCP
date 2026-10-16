@@ -3,6 +3,16 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
+using SqlServerDevLens.Runtime;
+
+if (args.Contains("--desktop"))
+{
+    var pipeArgument = Array.IndexOf(args, "--pipe-name");
+    var pipeName = pipeArgument >= 0 && pipeArgument + 1 < args.Length ? args[pipeArgument + 1] : null;
+    try { await DesktopBridge.RunAsync(Console.OpenStandardInput(), Console.OpenStandardOutput(), pipeName); }
+    catch (Exception) { Console.Error.WriteLine("Desktop MCP server unavailable or disconnected. Open DevLens, test SQL and confirm the server is Running; reconnect the plugin."); Environment.ExitCode = 1; }
+    return;
+}
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Logging.ClearProviders();

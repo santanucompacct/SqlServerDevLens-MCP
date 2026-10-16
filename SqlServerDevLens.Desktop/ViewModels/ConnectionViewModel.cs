@@ -11,6 +11,7 @@ namespace SqlServerDevLens.Desktop.ViewModels;
 
 public partial class ConnectionViewModel : ViewModelBase
 {
+    public event Func<ConnectionProfile, Task>? ConnectionSucceeded;
     private readonly IConnectionTester _tester;
     private readonly IProfileStore _profiles;
     private readonly ICredentialStore _credentials;
@@ -25,7 +26,7 @@ public partial class ConnectionViewModel : ViewModelBase
     [ObservableProperty] private bool _trustServerCertificate;
     [ObservableProperty] private bool _rememberProfile;
     [ObservableProperty] private bool _rememberPassword;
-    [ObservableProperty] private string _status = "Test opens and closes a connection; it does not start the MCP host.";
+    [ObservableProperty] private string _status = "A successful test opens the MCP server control screen. The SQL connection is closed after testing.";
     [ObservableProperty] private bool _isBusy;
     public bool IsSqlAuthentication => !WindowsAuthentication;
     public bool IsEditable => !IsBusy;
@@ -77,6 +78,7 @@ public partial class ConnectionViewModel : ViewModelBase
     [RelayCommand]
     private async Task TestConnectionAsync()
     {
+        ConnectionProfile? testedProfile = null;
         IsBusy = true;
         try
         {
@@ -90,6 +92,7 @@ public partial class ConnectionViewModel : ViewModelBase
             Status = result.Message;
             if (result.Success)
             {
+                testedProfile = profile;
                 var previous = await _profiles.LoadAsync();
                 // Delete the old secret before replacing/removing its profile so it remains discoverable on failure.
                 if (_credentials.IsAvailable && previous is not null)
@@ -107,6 +110,8 @@ public partial class ConnectionViewModel : ViewModelBase
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Win32Exception or JsonException or ArgumentException)
         { Status = "SQL test finished, but profile/password changes could not be completed. Check local permissions and Windows Credential Manager; password was not saved to JSON."; }
         finally { Password = ""; IsBusy = false; }
+        if (testedProfile is not null && ConnectionSucceeded is not null)
+            await ConnectionSucceeded(testedProfile);
     }
 
     [RelayCommand]

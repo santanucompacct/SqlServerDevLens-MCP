@@ -1,7 +1,8 @@
-param([string]$HostDll = "$PSScriptRoot/../SqlServerDevLens.McpHost/bin/Release/net10.0/SqlServerDevLens.McpHost.dll")
+param([string]$HostDll = "$PSScriptRoot/../SqlServerDevLens.McpHost/bin/Release/net10.0/SqlServerDevLens.McpHost.dll", [switch]$Desktop)
 $ErrorActionPreference = 'Stop'
 $start = [System.Diagnostics.ProcessStartInfo]::new('dotnet')
 $start.ArgumentList.Add([System.IO.Path]::GetFullPath($HostDll))
+if ($Desktop) { $start.ArgumentList.Add('--desktop') }
 $start.UseShellExecute = $false
 $start.CreateNoWindow = $true
 $start.RedirectStandardInput = $true
@@ -30,7 +31,8 @@ try {
     $call = Read-Response 3
     if ($call.result.isError) { throw 'Status tool returned an error' }
     $status = $call.result.content[0].text | ConvertFrom-Json
-    if ($status.status -ne 'ready' -or $status.sqlConnected -ne $false) { throw 'Unexpected host status' }
+    $expectedStatus = if ($Desktop) { 'running' } else { 'ready' }
+    if ($status.status -ne $expectedStatus -or $status.sqlConnected -ne $false) { throw 'Unexpected host status' }
     Write-Output 'PASS: initialize, tools/list, get_server_status; stdout contained JSON protocol responses.'
 }
 finally {

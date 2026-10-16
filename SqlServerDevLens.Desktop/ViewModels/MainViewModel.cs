@@ -18,14 +18,42 @@ public class MainViewModel : ViewModelBase
 {
     private DevLensMode _selectedMode = DevLensMode.SqlOnly;
     private bool _isChoosingMode = true;
+    private bool _isServerStepVisible;
+    private bool _shuttingDown;
 
-    public MainViewModel()
+    public MainViewModel() : this(new ConnectionViewModel(), new ServerViewModel()) { }
+    public MainViewModel(ConnectionViewModel connection, ServerViewModel server)
     {
+        Connection = connection; Server = server;
+        Connection.ConnectionSucceeded += async profile =>
+        {
+            if (_shuttingDown) return;
+            IsServerStepVisible = true;
+            await Server.StartAsync(profile, Connection.Status);
+        };
         ContinueCommand = new AsyncRelayCommand(async () => { await Connection.LoadAsync(); IsChoosingMode = false; });
         BackCommand = new RelayCommand(() => { Connection.Password = ""; IsChoosingMode = true; });
+        ReturnToConnectionCommand = new AsyncRelayCommand(async () =>
+        {
+            if (!Server.CanReturn) return;
+            await Server.StopAsync();
+            IsServerStepVisible = false; await Connection.LoadAsync();
+        });
     }
 
-    public ConnectionViewModel Connection { get; } = new();
+    public ConnectionViewModel Connection { get; }
+    public ServerViewModel Server { get; }
+    public IAsyncRelayCommand ReturnToConnectionCommand { get; }
+    public async System.Threading.Tasks.Task ShutdownAsync()
+    {
+        _shuttingDown = true;
+        await Server.StopAsync();
+    }
+    public bool IsServerStepVisible
+    {
+        get => _isServerStepVisible;
+        private set { if (SetProperty(ref _isServerStepVisible, value)) OnPropertyChanged(nameof(IsConnectionStepVisible)); }
+    }
     public IAsyncRelayCommand ContinueCommand { get; }
 
     public IRelayCommand BackCommand { get; }
@@ -68,7 +96,7 @@ public class MainViewModel : ViewModelBase
         }
     }
 
-    public bool IsConnectionStepVisible => !IsChoosingMode;
+    public bool IsConnectionStepVisible => !IsChoosingMode && !IsServerStepVisible;
 
     private void SelectMode(DevLensMode mode)
     {
