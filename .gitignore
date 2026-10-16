@@ -361,3 +361,24 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# SQL Server DevLens MCP - Local Configuration
+**/connections.json
+**/credentials.json
+**/*.secrets.json
+**/appsettings.Local.json
+
+# Environment-specific secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Postman local configuration
+**/postman.local.json
+**/postman.environment.local.json
+
+# Platform-specific generated files
+.DS_Store
+Thumbs.db
+.idea/
+  
