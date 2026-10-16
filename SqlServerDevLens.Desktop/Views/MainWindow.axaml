@@ -8,7 +8,7 @@
         x:Class="SqlServerDevLens.Desktop.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="SQL Server DevLens MCP"
-        Icon="/Assets/devlens-owl.png"
+        Icon="/Assets/devlens-owl.ico"
         Width="880" Height="680"
         MinWidth="680" MinHeight="570"
         WindowStartupLocation="CenterScreen"
