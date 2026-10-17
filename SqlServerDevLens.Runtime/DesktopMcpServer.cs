@@ -1,6 +1,8 @@
 using System.IO.Pipes;
 using System.Security.Cryptography;
 using System.Text;
+using System.Diagnostics;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using SqlServerDevLens.Core;
 
@@ -9,6 +11,7 @@ namespace SqlServerDevLens.Runtime;
 public interface IDesktopMcpServer : IAsyncDisposable
 {
     bool IsRunning { get; }
+    ServerActivityLog Activity { get; }
     event Action? StoppedUnexpectedly;
     Task StartAsync(DateTimeOffset sqlTestedAt, ISqlDatabase? database = null, PostmanSelection? postman = null, PostmanWorkflow? postmanActions = null);
     Task StopAsync();
@@ -35,6 +38,8 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
     private McpServerTool[] _tools = [];
     private volatile bool _isRunning;
     public bool IsRunning => _isRunning;
+    public ServerActivityLog Activity { get; } = new();
+    private long _requestNumber;
     public event Action? StoppedUnexpectedly;
 
     private NamedPipeServerStream CreateListener(bool firstInstance = false) => new(
@@ -56,6 +61,7 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
             _tools = tools;
             _shutdown = new CancellationTokenSource();
             _isRunning = true;
+            Activity.Add("Server", "Running", "Ready to receive MCP requests.");
             _acceptLoop = AcceptAsync(_listener, sqlTestedAt, _shutdown.Token);
         }
         finally { _lifecycle.Release(); }
@@ -94,6 +100,7 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
         catch (Exception)
         {
             _isRunning = false;
+            Activity.Add("Server", "Stopped unexpectedly", "Return to connection setup before reconnecting.");
             _shutdown!.Cancel();
             _database?.Dispose(); _database = null;
             _postmanActions?.Dispose(); _postmanActions = null;
@@ -115,7 +122,27 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
         {
             await using var server = McpServer.Create(new StreamServerTransport(session.Pipe, session.Pipe), new McpServerOptions
             {
-                ToolCollection = [.._tools]
+                ToolCollection = [.._tools],
+                Filters = new() { Request = new() { CallToolFilters = [next => async (context, token) =>
+                {
+                    // Only SDK-matched, known tool names; never log user arguments or results.
+                    var tool = _tools.Any(t => t.ProtocolTool.Name == context.Params?.Name)
+                        ? context.Params!.Name : "MCP request";
+                    var operation = $"#{Interlocked.Increment(ref _requestNumber)} {tool}";
+                    var timer = Stopwatch.StartNew();
+                    Activity.Add(operation, "Serving", "Request received.");
+                    try
+                    {
+                        var result = await next(context, token).ConfigureAwait(false);
+                        Activity.Add(operation, result.IsError == true ? "Failed" : "Completed",
+                            $"{timer.Elapsed.TotalSeconds:F1}s · Tool call finished; see chat for its result.");
+                        return result;
+                    }
+                    catch (OperationCanceledException)
+                    { Activity.Add(operation, "Cancelled / timed out", "Check the result before retrying an approved action."); throw; }
+                    catch
+                    { Activity.Add(operation, "Failed", "See chat for the error. Approved actions may need verification before retrying."); throw; }
+                }] } }
             });
             await server.RunAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -150,6 +177,7 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
         {
             if (_shutdown is null) return;
             _isRunning = false;
+            Activity.Add("Server", "Stopping", "Closing sessions and clearing pending approvals.");
             _shutdown.Cancel();
             _postmanActions?.Dispose(); _postmanActions = null;
             NamedPipeServerStream? listener;
@@ -168,6 +196,7 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
             _database?.Dispose(); _database = null;
             _tools = [];
             _shutdown.Dispose(); _shutdown = null; _listener = null; _acceptLoop = null;
+            Activity.Add("Server", "Stopped", "Desktop sessions closed.");
         }
         finally { _lifecycle.Release(); }
     }

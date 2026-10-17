@@ -141,8 +141,50 @@ public class ConfirmationTests
         Assert.True(help.IsVisible); help.Close(); owner.Close();
     });
 
+    [Theory]
+    [InlineData(680)]
+    [InlineData(880)]
+    [InlineData(1280)]
+    public Task ActivityPanelStaysBesideServerInformationAndUpdatesOnUiThread(int width) => RunOnUi(async () =>
+    {
+        var runtime = new FakeServer();
+        var connection = new ConnectionViewModel(new SuccessfulTester(), new EmptyProfiles(), new UnavailableCredentialStore())
+            { Host = "localhost", Database = "Example", WindowsAuthentication = true };
+        var model = new MainViewModel(connection, new ServerViewModel(runtime));
+        var window = new MainWindow { DataContext = model, Width = width,
+            ConfirmActionAsync = (_, _, _) => Task.FromResult(true) };
+        await model.ContinueCommand.ExecuteAsync(null);
+        await connection.TestConnectionCommand.ExecuteAsync(null);
+        window.Show();
+        await Task.Run(() => runtime.Activity.Add("#1 get_server_status", "Serving", "Request received."));
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        Assert.True(model.IsServerStepVisible);
+        Assert.Single(model.Server.ActivityEntries);
+        var columns = window.FindControl<Grid>("ServerColumns")!;
+        Assert.True(columns.Bounds.Width > 400);
+        Assert.Equal(2, columns.Children.Count);
+        Assert.Equal(columns.Children[0].Bounds.Width, columns.Children[1].Bounds.Width, 1);
+        Assert.True(columns.Children[1].Bounds.X > columns.Children[0].Bounds.Right);
+        Assert.Equal(340, window.FindControl<ScrollViewer>("ActivityScroll")!.Bounds.Height);
+        window.Close();
+    });
+
+    private sealed class SuccessfulTester : IConnectionTester
+    {
+        public Task<ConnectionTestResult> TestAsync(ConnectionProfile profile, string? password, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ConnectionTestResult(true, "Connected."));
+    }
+    private sealed class EmptyProfiles : IProfileStore
+    {
+        public Task<ConnectionProfile?> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult<ConnectionProfile?>(null);
+        public Task SaveAsync(ConnectionProfile profile, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task DeleteAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
     private sealed class FakeServer : IDesktopMcpServer
     {
+        public ServerActivityLog Activity { get; } = new();
         public bool IsRunning { get; private set; }
         public int StopCount;
         public event Action? StoppedUnexpectedly { add { } remove { } }

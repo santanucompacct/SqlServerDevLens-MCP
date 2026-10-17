@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:SqlServerDevLens.Desktop.ViewModels"
+        xmlns:runtime="using:SqlServerDevLens.Runtime"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
@@ -161,6 +162,9 @@
                     </StackPanel>
                     <StackPanel IsVisible="{Binding IsServerStepVisible}" Spacing="18">
                         <TextBlock Text="MCP server" FontSize="26" FontWeight="Bold" />
+                        <Grid x:Name="ServerColumns" ColumnDefinitions="*,*" ColumnSpacing="20">
+                        <Grid Grid.Column="0" RowDefinitions="*,Auto,Auto" RowSpacing="16">
+                        <ScrollViewer MaxHeight="340" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel DataContext="{Binding Server}" x:DataType="vm:ServerViewModel" Spacing="16">
                             <TextBlock Text="{Binding Status}" FontSize="18" Foreground="#7DD3FC" TextWrapping="Wrap" />
                             <TextBlock Text="{Binding ConnectionSummary}" TextWrapping="Wrap" />
@@ -168,9 +172,38 @@
                             <TextBlock Text="SQL exploration and procedure tools are available for this database. Procedure and table changes, INSERT and UPDATE require review and explicit approval in this DevLens window. Table data actions use a transaction and row limit. Private schema backups do not back up table rows. Each operation opens and closes its own connection." TextWrapping="Wrap" />
                             <TextBlock Text="{Binding PostmanSummary}" TextWrapping="Wrap" Foreground="#7DD3FC" />
                             <TextBlock Text="Keep this window open. Enable the updated DevLens local plugin to connect. Discovery and chat clients can connect simultaneously (up to 16 sessions). Stop closes desktop sessions. With the updated plugin, the status tool stays available and reconnects automatically on the next call after DevLens starts again." TextWrapping="Wrap" />
-                            <Button Content="Stop MCP server" Click="StopServer_Click" IsEnabled="{Binding CanStop}" Background="#B91C1C" Foreground="White" />
+
+
                         </StackPanel>
-                        <Button Content="Back to connection setup" Command="{Binding ReturnToConnectionCommand}" IsEnabled="{Binding Server.CanReturn}" />
+                        </ScrollViewer>
+                        <Button Grid.Row="1" Content="Stop MCP server" Click="StopServer_Click" IsEnabled="{Binding Server.CanStop}" Background="#B91C1C" Foreground="White" />
+                        <Button Grid.Row="2" Content="Back to connection setup" Command="{Binding ReturnToConnectionCommand}" IsEnabled="{Binding Server.CanReturn}" />
+                        </Grid>
+                        <Border Grid.Column="1" Background="#0B1220" BorderBrush="#2B3C55" BorderThickness="1" CornerRadius="10" Padding="14">
+                            <Grid RowDefinitions="Auto,Auto,*" RowSpacing="10">
+                                <TextBlock Text="Activity log" FontSize="18" FontWeight="SemiBold" />
+                                <TextBlock Grid.Row="1" Text="Latest first · last 200 events this session. Completed means the tool call finished; approval and saving are separate steps." FontSize="12" Foreground="#94A3B8" TextWrapping="Wrap" />
+                                <ScrollViewer x:Name="ActivityScroll" Grid.Row="2" Height="340" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsControl ItemsSource="{Binding Server.ActivityEntries}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="runtime:ServerActivity">
+                                                <Border BorderBrush="#2B3C55" BorderThickness="0,0,0,1" Padding="0,9">
+                                                    <StackPanel Spacing="4">
+                                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                            <TextBlock Text="{Binding State}" Foreground="#7DD3FC" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding Timestamp}" FontSize="11" Foreground="#94A3B8" />
+                                                        </Grid>
+                                                        <TextBlock Text="{Binding Operation}" TextWrapping="Wrap" FontSize="12" />
+                                                        <TextBlock Text="{Binding Detail}" TextWrapping="Wrap" FontSize="11" Foreground="#94A3B8" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Grid>
+                        </Border>
+                        </Grid>
                     </StackPanel>
                     </Grid>
                 </Border>

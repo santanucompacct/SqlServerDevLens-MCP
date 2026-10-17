@@ -147,6 +147,7 @@ public class PostmanTests
     }
     private sealed class Server : IDesktopMcpServer
     {
+        public ServerActivityLog Activity { get; } = new();
         public bool IsRunning { get; private set; } public PostmanSelection? Selection;
         public event Action? StoppedUnexpectedly { add {} remove {} }
         public Task StartAsync(DateTimeOffset at, ISqlDatabase? db = null, PostmanSelection? postman = null, PostmanWorkflow? postmanActions = null) { Selection = postman; IsRunning = true; db?.Dispose(); return Task.CompletedTask; }

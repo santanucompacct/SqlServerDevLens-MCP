@@ -2,7 +2,7 @@
 
 **Your SQL Server, understood by AI.** MIT-licensed .NET 10 / Avalonia desktop application with owl branding.
 
-## Version 0.8.0: SQL and approved Postman actions
+## Version 0.8.1: server activity panel
 
 Completed: inspect table structure/data and procedure definitions; execute procedures with parameters and multiple result sets; create/modify procedures; create tables, add/alter columns, insert rows and update rows. Every procedure execution/change and table write requires explicit approval in DevLens. See [release notes](CHANGELOG.md) for verified coverage and limits. Postman setup, selected-collection metadata and explicitly approved folder/request creation, editing and supported HTTP execution are available.
 
@@ -63,6 +63,14 @@ The row limit covers direct INSERT/UPDATE rows, **not ALTER's existing data, tri
 Before ALTER TABLE, catalog metadata for columns/defaults/computed expressions, indexes, checks, visible foreign keys and table triggers is saved with owner-restricted permissions in `LocalApplicationData/SqlServerDevLens/TableSchemaBackups`. Failure blocks application. This JSON snapshot is **not table data, a complete database/schema backup, or a runnable restore script**. CREATE has no previous schema; DML does not export before-images of table rows. The approval window explicitly states these limits.
 
 Synthetic tests validate parser restrictions, approval forgery/wrong-action/replay rejection and transport. The disposable localhost SQL Server integration test exercises real CREATE/INSERT/UPDATE/ALTER, direct counts, review drift, constraint rollback, private metadata snapshots, backup failure and a SQL login denied writes despite desktop approval. It never contacts a production profile. Native ChatGPT table-tool discovery and manual desktop approval remain a user upgrade check: rebuild DevLens, reinstall plugin 0.8.0 and restart ChatGPT once.
+
+## Live server activity (desktop 0.8.1)
+
+The existing server panel has two columns: scrollable server information and Stop/Back controls on the left, and a scrollable activity log on the right. Latest events appear first. It shows tool requests received/serving, completed, failed or cancelled; approval requests/decisions; and server start/stop. Generated request numbers pair serving/completion events across concurrent clients, with local timestamps and elapsed time.
+
+This is operational feedback, not an audit trail or proof that a change committed. Completed means the tool call returned; preparing, approval and applying are separate steps. Check the tool result in chat, particularly after errors/timeouts. Only tool names, generated request numbers, states and fixed messages are logged. SQL, arguments, credentials, bodies, results and raw exception messages are excluded. The latest 200 events stay in desktop memory across Stop/Start and disappear when the application closes. No log files or stdout output are created.
+
+For this desktop-only update, pull `feature/postman-setup`, close DevLens, rebuild in Visual Studio 2026 and start without debugging (Ctrl+F5). Reconnect SQL/Postman as usual. The existing 0.8.0 adapter works unchanged; no plugin reinstall or ChatGPT restart is required for this panel.
 
 ## Postman setup and approved actions (plugin 0.8.0)
 

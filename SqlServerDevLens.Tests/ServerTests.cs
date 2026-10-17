@@ -23,8 +23,20 @@ public class ServerTests
         Assert.True(server.IsRunning);
         await CheckStatus(name, testedAt, timeout.Token);
         await CheckStatus(name, testedAt, timeout.Token);
+        var activity = server.Activity.Snapshot();
+        Assert.Equal(2, activity.Count(e => e.State == "Serving"));
+        Assert.Equal(2, activity.Count(e => e.State == "Completed"));
+        Assert.Contains("get_server_status", activity[0].Operation);
+        Assert.Equal("Completed", activity[0].State);
+        var rejected = await new DesktopStatusClient(name).CallAsync("query_read_only",
+            new Dictionary<string, object?> { ["sql"] = "SELECT 'PRIVATE-SENTINEL'", ["maxRows"] = 1 }, timeout.Token);
+        Assert.True(rejected.IsError);
+        activity = server.Activity.Snapshot();
+        Assert.Equal("Failed", activity[0].State);
+        Assert.DoesNotContain("PRIVATE-SENTINEL", string.Join("\n", activity.Select(e => e.ToString())));
         await server.StopAsync();
         Assert.False(server.IsRunning);
+        Assert.Equal("Stopped", server.Activity.Snapshot()[0].State);
         await using (var absent = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous))
             await Assert.ThrowsAsync<TimeoutException>(() => absent.ConnectAsync(150));
         await server.StartAsync(testedAt);
@@ -154,6 +166,7 @@ public class ServerTests
     private sealed class FakeServer : IDesktopMcpServer
     {
         public bool FailStartup;
+        public ServerActivityLog Activity { get; } = new();
         public bool IsRunning { get; private set; }
         public event Action? StoppedUnexpectedly { add { } remove { } }
         public Task StartAsync(DateTimeOffset sqlTestedAt, SqlServerDevLens.Core.ISqlDatabase? database = null, SqlServerDevLens.Core.PostmanSelection? postman = null, SqlServerDevLens.Core.PostmanWorkflow? postmanActions = null)

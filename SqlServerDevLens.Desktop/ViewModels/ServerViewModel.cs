@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using System.Collections.ObjectModel;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -12,6 +13,7 @@ namespace SqlServerDevLens.Desktop.ViewModels;
 public partial class ServerViewModel : ViewModelBase
 {
     private readonly IDesktopMcpServer _server;
+    public ObservableCollection<ServerActivity> ActivityEntries { get; } = [];
     [ObservableProperty] private bool _isRunning;
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _status = "Stopped";
@@ -25,6 +27,11 @@ public partial class ServerViewModel : ViewModelBase
     public ServerViewModel(IDesktopMcpServer server)
     {
         _server = server;
+        _server.Activity.Changed += () => Dispatcher.UIThread.Post(() =>
+        {
+            ActivityEntries.Clear();
+            foreach (var entry in _server.Activity.Snapshot()) ActivityEntries.Add(entry);
+        });
         _server.StoppedUnexpectedly += () => Dispatcher.UIThread.Post(() =>
         { IsRunning = false; Status = "Server stopped unexpectedly. Return to connection setup and test again."; });
     }
@@ -42,11 +49,11 @@ public partial class ServerViewModel : ViewModelBase
             var database = new SqlDatabase(profile, password, (request, decision, token) =>
             {
                 if (RequestProcedureReview is null) { decision(false); return; }
-                RequestProcedureReview(request, decision, token);
+                Review(request, decision, token);
             });
             PostmanWorkflow? postmanActions = postman is not null && !string.IsNullOrEmpty(postmanKey)
                 ? new PostmanWorkflow(new PostmanActionBackend(postmanKey, postman), (request, decision, token) =>
-                    { if(RequestProcedureReview is null) { decision(false); return; } RequestProcedureReview(request, decision, token); }) : null;
+                    { if(RequestProcedureReview is null) { decision(false); return; } Review(request, decision, token); }) : null;
             try { await _server.StartAsync(DateTimeOffset.UtcNow, database, postman, postmanActions); }
             catch { database.Dispose(); postmanActions?.Dispose(); throw; }
             IsRunning = _server.IsRunning;
@@ -59,6 +66,16 @@ public partial class ServerViewModel : ViewModelBase
             Status = "Could not start the MCP server. Another DevLens window may already be running, or local permissions prevent startup.";
         }
         finally { IsBusy = false; }
+    }
+    private void Review(ProcedureReview request, Action<bool> decision, System.Threading.CancellationToken token)
+    {
+        var operation = request.TargetKind == "postman" ? "Postman approval" : "SQL approval";
+        _server.Activity.Add(operation, "Awaiting approval", "Review the separate DevLens approval window.");
+        RequestProcedureReview!(request, approved =>
+        {
+            _server.Activity.Add(operation, approved ? "Approved" : "Rejected", "Approval decision received; applying is a separate tool call.");
+            decision(approved);
+        }, token);
     }
     [RelayCommand]
     public async Task StopAsync()

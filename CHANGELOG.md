@@ -1,5 +1,12 @@
 # Release notes
 
+## 0.8.1 — Server activity panel (2026-10-17)
+
+- Kept the existing server panel, with scrollable information and Stop/Back controls on the left and a latest-first activity log on the right.
+- Added request numbers, serving/completed/failed/cancelled states, elapsed time, approval decisions and server lifecycle events. Completion records tool-call completion, not proof of an applied change.
+- Kept only 200 events in desktop memory, with no SQL/arguments/credentials/bodies/results/raw errors in the log and no disk/stdout logging. UI notification failures do not change tool outcomes.
+- Existing SQL/Postman operations and approval requirements are preserved. Rebuild the desktop; the existing 0.8.0 adapter remains compatible.
+
 ## 0.8.0 — Desktop-approved Postman actions (2026-10-17)
 
 - Added live item IDs/masked request inspection plus separate prepare/status/apply/run MCP tools for the selected collection.
