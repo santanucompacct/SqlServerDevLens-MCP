@@ -4,7 +4,7 @@
 
 ## Version 0.9.0: SQL + Postman and Windows portable distribution
 
-**No Visual Studio? [Download and setup the Windows x64 portable package](distribution/README.md).** It bundles the desktop app, .NET runtime, MCP adapter EXE, skill and plugin setup files. Compiled ZIP/checksum downloads are GitHub Release assets; the distribution folder holds reproducible packaging/setup instructions.
+**No Visual Studio? Open [windows_installer](windows_installer/README.md) for the Windows x64 setup download and verified downloader.** It bundles the desktop app, .NET runtime, MCP adapter EXE, skill and plugin setup files. Compiled ZIP/checksum downloads are GitHub Release assets; [distribution](distribution/README.md) holds reproducible packaging/setup instructions.
 
 First-time setup or starting work in an existing chat: **[Connection guide and copyable SQL / SQL + Postman prompts](docs/CONNECTING-TO-CHATGPT.md)**. The in-app Help window includes Copy buttons for these prompts.
 
