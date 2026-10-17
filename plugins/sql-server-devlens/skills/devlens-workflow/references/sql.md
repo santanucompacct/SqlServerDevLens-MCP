@@ -12,7 +12,7 @@ This query tool does not allow writes, EXEC, database switching, arbitrary batch
 
 ## Procedures
 
-Read `get_procedure_definition(schema, name)` for the current complete supported definition, revision and scalar parameters. Do not infer required parameters or report branches from a procedure's name.
+Read `get_procedure_definition(schema, name)` for the first definition page, full-definition revision and scalar parameters. Follow `nextOffset` using `offset` and the first page's `expectedRevision` until `complete` is true. Pages default to 32,000 UTF-16 code units; `maxCharacters` supports 256-128,000. On revision mismatch discard the pages and restart; never claim parity or prepare an edit from incomplete source. The full procedure has no application character cap. Do not infer required parameters or report branches from a procedure's name.
 
 | Intent | Prepare | Status | Apply once after approval |
 | --- | --- | --- | --- |

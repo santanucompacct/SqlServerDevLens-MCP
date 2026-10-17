@@ -1,5 +1,11 @@
 # Release notes
 
+## 0.10.0 - Large stored procedures (unreleased)
+
+- Remove the 128,000-character cap from full procedure reads and CREATE/ALTER validation. Revision checks, explicit desktop approval and private full-definition backups remain in place.
+- Page definition responses with total length, next offset and completion state. Continuations require the full-definition revision and fail if the procedure changed; UTF-16 surrogate pairs are preserved.
+- Rebuild both desktop and stdio adapter, refresh the plugin and restart the chat app for the new paging schema. Memory, transport and timeout limits remain. No production procedure was changed or executed during development.
+
 ## Unreleased — Windows portable plugin discovery
 
 - Fix the portable MCP command to `./server/SqlServerDevLens.McpHost.exe`. The local Agent Plugins loader rejects `${PLUGIN_ROOT}` in `command`, silently leaving the skill available without MCP tools. Arguments and working directory retain their supported configuration.

@@ -113,7 +113,8 @@ public class DisposableProcedureIntegrationTests
             var backend = new SqlProcedureBackend(name, () => builder.ConnectionString, new PrivateProcedureBackupStore(backupPath));
             Action<bool>? decision = null;
             using var workflow = new ProcedureWorkflow(backend, (_, approve, _) => decision = approve);
-            const string create = "CREATE PROCEDURE dbo.Example @value int, @label nvarchar(50)=N'default', @output int OUTPUT AS BEGIN SET NOCOUNT ON; SELECT @value AS value,@label AS label; SELECT @value+1 AS second_value; SET @output=@value*2; RETURN 7; END";
+            // Exercise full read, approval, execution, ALTER and private backup above the old 128K cap.
+            var create = "CREATE PROCEDURE dbo.Example @value int, @label nvarchar(50)=N'default', @output int OUTPUT AS BEGIN /*" + new string('x', 160000) + "*/ SET NOCOUNT ON; SELECT @value AS value,@label AS label; SELECT @value+1 AS second_value; SET @output=@value*2; RETURN 7; END";
             var pending = await workflow.PrepareChangeAsync("dbo", "Example", create, true, timeout.Token);
             Assert.Null(await backend.ReadAsync("dbo", "Example", timeout.Token));
             await Assert.ThrowsAsync<InvalidOperationException>(() => workflow.ApplyAsync(pending.RequestId, timeout.Token));

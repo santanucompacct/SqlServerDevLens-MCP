@@ -162,7 +162,7 @@ public static class ProcedureSql
     public static string QuotedName(string schema, string name) => $"[{schema.Replace("]", "]]" )}].[{name.Replace("]", "]]" )}]";
     public static ProcedureStatementBody Parse(string sql)
     {
-        if (string.IsNullOrWhiteSpace(sql) || sql.Length > 128000) throw new ArgumentException("Procedure SQL must be complete and at most 128,000 characters.");
+        if (string.IsNullOrWhiteSpace(sql)) throw new ArgumentException("Procedure SQL must be complete and nonempty.");
         var script = new TSql170Parser(true).Parse(new StringReader(sql), out var errors) as TSqlScript;
         if (errors.Count > 0 || script is null || script.Batches.Count != 1 || script.Batches[0].Statements.Count != 1 ||
             script.Batches[0].Statements[0] is not ProcedureStatementBody body || body.MethodSpecifier is not null)
