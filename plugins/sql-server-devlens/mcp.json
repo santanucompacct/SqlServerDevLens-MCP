@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "sql-server-devlens": {
+      "type": "stdio",
+      "command": "dotnet",
+      "args": ["${PLUGIN_ROOT}/server/SqlServerDevLens.McpHost.dll", "--desktop"],
+      "cwd": "${PLUGIN_ROOT}"
+    }
+  }
+}

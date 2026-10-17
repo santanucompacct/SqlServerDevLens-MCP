@@ -1,0 +1,10 @@
+{
+  "name": "devlens-local",
+  "interface": {"displayName": "DevLens Local"},
+  "plugins": [{
+    "name": "sql-server-devlens",
+    "source": {"source": "local", "path": "./plugins/sql-server-devlens"},
+    "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+    "category": "Productivity"
+  }]
+}

@@ -12,21 +12,49 @@ public enum DevLensMode
 }
 
 /// <summary>
-/// Manages the startup selection screen. Database connectivity and the
-/// MCP host will be introduced in subsequent milestones.
+/// Manages startup mode selection and navigation to connection setup.
 /// </summary>
 public class MainViewModel : ViewModelBase
 {
     private DevLensMode _selectedMode = DevLensMode.SqlOnly;
     private bool _isChoosingMode = true;
+    private bool _isServerStepVisible;
+    private bool _shuttingDown;
 
-    public MainViewModel()
+    public MainViewModel() : this(new ConnectionViewModel(), new ServerViewModel()) { }
+    public MainViewModel(ConnectionViewModel connection, ServerViewModel server)
     {
-        ContinueCommand = new RelayCommand(() => IsChoosingMode = false);
-        BackCommand = new RelayCommand(() => IsChoosingMode = true);
+        Connection = connection; Server = server;
+        Connection.ConnectionSucceeded += async (profile, password) =>
+        {
+            if (_shuttingDown) return;
+            IsServerStepVisible = true;
+            await Server.StartAsync(profile, Connection.Status, password);
+        };
+        ContinueCommand = new AsyncRelayCommand(async () => { await Connection.LoadAsync(); IsChoosingMode = false; });
+        BackCommand = new RelayCommand(() => { Connection.Password = ""; IsChoosingMode = true; });
+        ReturnToConnectionCommand = new AsyncRelayCommand(async () =>
+        {
+            if (!Server.CanReturn) return;
+            await Server.StopAsync();
+            IsServerStepVisible = false; await Connection.LoadAsync();
+        });
     }
 
-    public IRelayCommand ContinueCommand { get; }
+    public ConnectionViewModel Connection { get; }
+    public ServerViewModel Server { get; }
+    public IAsyncRelayCommand ReturnToConnectionCommand { get; }
+    public async System.Threading.Tasks.Task ShutdownAsync()
+    {
+        _shuttingDown = true;
+        await Server.StopAsync();
+    }
+    public bool IsServerStepVisible
+    {
+        get => _isServerStepVisible;
+        private set { if (SetProperty(ref _isServerStepVisible, value)) OnPropertyChanged(nameof(IsConnectionStepVisible)); }
+    }
+    public IAsyncRelayCommand ContinueCommand { get; }
 
     public IRelayCommand BackCommand { get; }
 
@@ -68,7 +96,7 @@ public class MainViewModel : ViewModelBase
         }
     }
 
-    public bool IsConnectionStepVisible => !IsChoosingMode;
+    public bool IsConnectionStepVisible => !IsChoosingMode && !IsServerStepVisible;
 
     private void SelectMode(DevLensMode mode)
     {

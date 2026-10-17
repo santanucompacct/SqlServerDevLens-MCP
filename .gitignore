@@ -381,4 +381,7 @@ FodyWeavers.xsd
 .DS_Store
 Thumbs.db
 .idea/
-  
+
+plugins/*/server/
+**/ProcedureBackups/
+**/TableSchemaBackups/

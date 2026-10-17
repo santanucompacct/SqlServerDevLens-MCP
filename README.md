@@ -1,116 +1,155 @@
 # SQL Server DevLens MCP
 
-**Your SQL Server, understood by AI.**
+**Your SQL Server, understood by AI.** MIT-licensed .NET 10 / Avalonia desktop application with owl branding.
 
-SQL Server DevLens MCP is an open-source, cross-platform .NET project aiming to help developers inspect Microsoft SQL Server databases and validate API behavior with AI assistants through the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/).
+## Version 0.6.1: SQL exploration and approved procedure/table actions
 
-The goal is a developer-friendly desktop application: choose an operating mode, enter SQL Server connection details (similar to SQL Server Management Studio), and expose approved SQL inspection and, optionally, API testing tools to an MCP-compatible client.
+Completed: inspect table structure/data and procedure definitions; execute procedures with parameters and multiple result sets; create/modify procedures; create tables, add/alter columns, insert rows and update rows. Every procedure execution/change and table write requires explicit approval in DevLens. See [release notes](CHANGELOG.md) for verified coverage and limits. Postman integration is the next planned milestone and is not implemented.
 
-> **Project status: early development / startup UI implemented.** The repository currently contains an Avalonia desktop application targeting .NET 10 with a working two-mode startup screen and navigation to a connection-setup placeholder. SQL connectivity, the MCP server, Postman integration, and automated testing **are planned and are not implemented yet**.
+Choose SQL Server Only or SQL Server + Postman, then enter a TCP host, port (default 1433), one required database, SQL or Windows authentication, and TLS settings. Encryption defaults on; trust-server-certificate defaults off. Named instances must be resolved to a TCP port. Windows authentication uses the process identity; macOS/Linux require configured Kerberos. **Postman is planned and inactive in both modes.**
 
-## Planned features
+Test Connection opens/disposes a SqlClient connection. On success the desktop starts its local MCP server and shows the control window. The tested connection details and password are retained **only in desktop process memory while the server runs**, including when Remember password is unchecked. No credentials are passed to the plugin process, command line or MCP client. Every SQL operation opens/disposes its own connection; pooling is disabled for tool connections. Stop cancels desktop sessions/SQL operations and releases the active context. Managed strings cannot be guaranteed zeroed by .NET.
 
-### SQL Server Only
+The desktop and plugin expose:
 
-- SSMS-style connection setup: host, port (default 1433), **one required database name**, authentication, TLS encryption, and certificate-trust settings.
-- Reusable saved connection profiles, with credentials stored securely outside configuration JSON.
-- Inspect tables, columns, keys, relationships, indexes, and stored procedure definitions.
-- Search database objects and retrieve limited, authorized sample data.
-- Expose controlled, **read-only-by-default** SQL exploration tools through MCP.
-- Open SQL connections per operation and dispose of them afterward, using standard ADO.NET connection pooling.
-
-### SQL Server + Postman (optional)
-
-- Reuse all SQL inspection functionality.
-- Work with existing Postman collections and add or update requests containing sample JSON and headers.
-- Optionally integrate with Postman CLI or compatible local collection runners.
-- Run approved API tests against explicitly configured **test environments**.
-- Verify API responses **and** expected database state changes using deterministic assertions.
-- Produce combined API/database test results for debugging and frontend handoff.
-
-The two modes will share **one MCP server** with separately organized tools. The SQL-only mode will not require Postman.
-
-## Technology
-
-| Area | Technology |
+| Tool | Behavior |
 | --- | --- |
-| Language | C# |
-| Framework | .NET 10 |
-| Desktop UI | Avalonia UI (currently 12.1.4) |
-| Architecture | MVVM with CommunityToolkit.Mvvm |
-| SQL access (planned) | Microsoft.Data.SqlClient |
-| MCP (planned) | Official C# MCP SDK |
-| Postman (planned, optional) | Postman collection integration and CLI / compatible runner |
-| Target platforms | Windows, macOS, and Linux |
-| License | MIT |
+| `get_server_status` | Running state, selected database, SQL configuration and last successful connection-test timestamp; does not query SQL. |
+| `get_database_info` | Selected database name, collation and updateability. |
+| `list_database_objects` | Up to 1000 visible tables, views, procedures and functions; does not execute them. |
+| `describe_table` | Schema/name parameters; columns, types, nullability, identity, primary keys and foreign-key targets for a table/view. Empty rows means missing or not visible. |
+| `query_read_only` | One SELECT, including CTEs, joins and aggregations; default 100 rows, configurable 1–500. |
 
-Avalonia supports cross-platform desktop development. Platform-specific builds and packaging will be addressed as the project matures.
+`query_read_only` uses Microsoft's ScriptDom parser. It rejects writes, SELECT INTO, sequences, EXEC/procedures, USE, multiple statements/batches, explicit cross-database/linked-server names, temporary objects, variables, external sources, table-valued/custom functions and hints. Common scalar/aggregate/window built-ins are allowlisted in `ReadOnlySql.cs`; other functions return a clear validation error. Unsupported SQL is rejected before connecting. The SELECT tool remains read-only. Procedure actions use the separate approval workflow below; raw EXEC and arbitrary DDL are still rejected by query_read_only.
 
-## Getting started (current scaffold)
+Results contain `Database`, `Columns` (name/type), `Rows` (arrays aligned to columns), `Truncated` and `ValuesTruncated` (JSON casing follows the SDK serializer). Duplicate column names are preserved. Null stays null. Text values are limited to 2000 characters; binary and complex values are omitted and flagged. Results are capped at 100 columns and a 200,000-character value budget. Metadata tools cap at 1000 rows and report truncation too. Use narrower projections/filters when truncated. SQL command timeout is 15 seconds; each desktop operation has a 25-second budget including opening/queueing and at most four operations run concurrently. The adapter allows 35 seconds for a SQL request. Cancellation is propagated; failed calls are never automatically replayed. Provider errors return safe error numbers/messages without SQL text, credentials or connection strings.
 
-### Prerequisites
+**Database permissions remain the security boundary.** Use a dedicated account with SELECT only on the approved objects in the selected database, plus metadata visibility as needed, without administrative/write/EXECUTE privileges. ApplicationIntent.ReadOnly is a routing hint, not permission enforcement. The parser prevents direct database switching; views, synonyms, ownership chains, computed/CLR expressions and underlying permissions are SQL Server concerns and can expose indirect access beyond a simple name check. Have the administrator approve those dependencies. DevLens does not change permissions or claim to sandbox a privileged account. See [Microsoft database permissions](https://learn.microsoft.com/en-us/sql/relational-databases/security/permissions-database-engine?view=sql-server-ver17) and [cross-database ownership chaining](https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/cross-db-ownership-chaining-server-configuration-option?view=sql-server-ver17).
 
-- [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
-- A supported .NET development environment, such as Visual Studio 2026 or a compatible editor
+Database results are untrusted data, never instructions. Rows returned through tools become available to the chat; request only the information you intend to share.
 
-The Avalonia dependencies are restored automatically through NuGet. You do **not** need a paid Avalonia extension to build this project.
+## Execute, modify and create procedures (plugin 0.6.1)
 
-### Clone and run
+The six additional tools are `get_procedure_definition`, `prepare_procedure_execution`, `execute_prepared_procedure`, `prepare_procedure_change`, `apply_procedure_change`, and `get_procedure_request`.
 
-```bash
-git clone https://github.com/santanucompacct/SqlServerDevLens-MCP.git
-cd SqlServerDevLens-MCP
+Read a procedure to get its complete source (up to 128,000 characters, otherwise an explicit error), revision and parameter metadata. VIEW DEFINITION is required. Encrypted, CLR, numbered and system procedures are unsupported. Execution supports up to 100 built-in scalar parameters; table-valued, custom/alias, binary, XML and legacy text parameters are not supported yet. Parameter JSON must be an object with exact names (the @ prefix is optional), scalar values and ISO dates. Pass a JSON payload parameter as an escaped JSON string. Unknown/duplicate names, incompatible types, missing required inputs, excessive lengths and decimal precision/scale that would round are rejected. Total input JSON is limited to 64,000 characters and a text parameter to 20,000. Omitted ordinary inputs use their declared defaults; omitted input/output parameters start as SQL NULL, so supply an explicit initial value when needed.
+
+**Chat permissions do not grant server approval.** Preparation stores an immutable request in desktop memory and opens a review window there. For execution it shows database, procedure, current definition and exact parameters. For ALTER/CREATE it shows full before/proposed source and an exact line replacement diff. Reject is the default. The user must click Approve this action once; no MCP argument/tool can approve. Approval does not immediately run SQL: the assistant subsequently calls the matching execute/apply tool using the returned requestId. Status/diff can be checked with get_procedure_request without repeated polling. Pending/denied requests cannot run. IDs are random, expire after five minutes, are consumed before SQL and are cleared by Stop. At most five requests are retained; overlapping desktop review windows are rejected. If the desktop cannot show approval, nothing is permitted.
+
+For a new procedure, prepare_procedure_change takes `create: true` and exactly one `CREATE PROCEDURE schema.name ...` statement. For modification use `create: false` and exactly one `ALTER PROCEDURE schema.name ...`. GO, additional top-level statements and CREATE OR ALTER are rejected. The target must match the supplied schema/name exactly. Procedure bodies are reviewed SQL, not a read-only sandbox: they and their dependencies/DDL triggers can write data, access other databases or have external effects within SQL Server permissions. Selecting a database restricts the procedure target, not every possible effect of its body. DevLens does not grant rights or change permissions. A DBA can grant EXECUTE/ALTER on approved procedures and VIEW DEFINITION as appropriate. Creation requires CREATE PROCEDURE plus ALTER on the intended schema. Avoid broad administrator permissions; a SELECT-only login remains suitable for exploration but cannot perform these actions.
+
+Before execution/application the current definition revision is checked again; a stale or recreated procedure requires a fresh review. Actions are serialized inside the active desktop context. This is optimistic checking, **not a lock against external SSMS/DBA changes**; an external ALTER can still race after the final check. Keep external deployments coordinated. Existing ANSI_NULLS and QUOTED_IDENTIFIER settings are preserved on ALTER; CREATE uses both ON. ALTER follows SQL Server semantics (including any signature/dependency effects); it is not an automatic migration.
+
+Before every approved ALTER, the previous complete definition and SET options must be saved successfully in `LocalApplicationData/SqlServerDevLens/ProcedureBackups`. Filenames are random, outside the repository. The directory is restricted to the Windows user by ACL or Unix mode 0700, with files mode 0600. Linked backup paths are rejected. Failure to secure/write the backup blocks ALTER. CREATE has no previous definition to back up. Backups are private recovery material, not automatic rollback scripts; review SQL/header and target before any restore. Definitions, backups, exports and results are not published to GitHub by these tools.
+
+Execution uses parameterized SqlCommand with CommandType.StoredProcedure, a fresh non-pooled ReadWrite-intent connection to the selected database, a 15-second command timeout and 25-second operation budget. It returns up to 10 result sets, 500 total rows, 100 columns per set and a 200,000-character value budget. Cells/output strings are capped at 2000 characters; complex/binary result values are omitted. Output parameters/return code are returned only when completion is known. Check Completed, per-set Truncated/ValuesTruncated and OutputValuesTruncated; large output parameters are capped at binding too. On result-limit cancellation, timeout, failure, disconnect or caller cancellation, **writes may already have committed**. Verify database state before preparing another request; never automatically retry or assume rollback. A consumed approval cannot be replayed.
+
+Example workflow: ask to read dbo.Example; discuss the logic; prepare an execution with fake/test parameters or prepare a complete ALTER/CREATE; inspect the DevLens window and approve/reject; then ask the assistant to execute/apply that approved request. These are capability changes only; the agent does not run or alter production procedures as part of building them.
+
+Procedure integration tests run only against an explicitly configured disposable localhost SQL Server, creating/dropping a uniquely named DevLensTest database. CI starts a short-lived SQL Server 2022 container with a randomly generated masked password, exercises real create/multiple-result execution/output/return code/ALTER/backup/stale revision/result limits and removes it. It never reads a saved production profile. Local tests skip this unless DEVLENS_PROCEDURE_TEST_CONNECTION_STRING points to localhost:1433 and DEVLENS_PROCEDURE_TEST_ALLOW_DATABASE_CREATE=1. Native ChatGPT procedure discovery and manual review-window behavior must still be checked after rebuilding DevLens, publishing/reinstalling 0.6.1 and restarting ChatGPT once.
+
+## Approved table SQL (plugin 0.6.1)
+
+`prepare_table_sql(schema, name, sql, maxAffectedRows=100)` prepares one exact statement and displays the action, target, proposed SQL, observed matching/insert count and current schema metadata in DevLens. It executes no proposed SQL. `get_table_request(requestId)` reads approval status; `apply_table_sql(requestId)` applies only that immutable request after desktop approval. These share the procedure approval queue: five-minute expiry, five outstanding requests, Reject by default, no approval tool/flag, single use and Stop clears everything. Table/procedure approvals cannot be used through the wrong apply tool.
+
+Supported: regular `CREATE TABLE`; `ALTER TABLE ... ADD` columns/constraints; `ALTER TABLE ... ALTER COLUMN`; `INSERT ... VALUES`/DEFAULT VALUES; and direct `UPDATE schema.table ... WHERE ...`. Exact target names must match. Default row limit is 100, configurable 1–500. UPDATE requires WHERE; INSERT SELECT/EXEC, MERGE, DELETE, DROP, TRUNCATE, joined updates, subqueries, aliases/TOP/OUTPUT, external names, variables, custom functions, hints and extra statements/GO are rejected. Special temporal, memory-optimized and FileTable targets are unsupported. Common built-in scalar functions follow the existing allowlist.
+
+SQL rights apply: SELECT and VIEW DEFINITION are needed to review existing tables; the account additionally needs the appropriate INSERT/UPDATE, ALTER or CREATE TABLE/schema permissions. DevLens never grants them. Views/synonyms are not direct write targets. All proposed SQL, schema metadata and backups remain private; no table rows or definitions are uploaded to GitHub by these tools.
+
+Application uses a fresh non-pooled connection and a serializable transaction, with a 15-second command timeout and 25-second operation budget. An exclusive table lock is taken for existing-table application (it can briefly block other users). Schema revision and UPDATE matching count are checked again under that lock. Changed schema/count or an over-limit match requires a new review. Actual direct row count is checked after INSERT/UPDATE; verification errors roll back the transaction. A successful response says `committed` and returns affected rows for DML. SQL/commit errors, disconnects and timeouts can have uncertain outcomes; verify state and never automatically replay. The consumed request cannot be retried.
+
+The row limit covers direct INSERT/UPDATE rows, **not ALTER's existing data, triggers, cascades, or external effects**. Those dependencies must be reviewed too. A WHERE clause is an intent guard, not an access-control mechanism. Schema changes/type conversions can affect every row and can lose information. Keep an appropriate database/data backup before potentially lossy work. DevLens does not automatically undo committed changes.
+
+Before ALTER TABLE, catalog metadata for columns/defaults/computed expressions, indexes, checks, visible foreign keys and table triggers is saved with owner-restricted permissions in `LocalApplicationData/SqlServerDevLens/TableSchemaBackups`. Failure blocks application. This JSON snapshot is **not table data, a complete database/schema backup, or a runnable restore script**. CREATE has no previous schema; DML does not export before-images of table rows. The approval window explicitly states these limits.
+
+Synthetic tests validate parser restrictions, approval forgery/wrong-action/replay rejection and transport. The disposable localhost SQL Server integration test exercises real CREATE/INSERT/UPDATE/ALTER, direct counts, review drift, constraint rollback, private metadata snapshots, backup failure and a SQL login denied writes despite desktop approval. It never contacts a production profile. Native ChatGPT table-tool discovery and manual desktop approval remain a user upgrade check: rebuild DevLens, reinstall plugin 0.6.1 and restart ChatGPT once.
+
+## Profiles and secure passwords
+
+Remember profile saves host/database/username/TLS metadata after a successful test in `Environment.SpecialFolder.LocalApplicationData/SqlServerDevLens/connections.json`. This metadata is not encrypted. **Passwords never go in JSON.** On Windows, Remember password securely uses Windows Credential Manager under the current user's account. On macOS/Linux it is disabled pending secure-store adapters.
+
+Changing connection identity/TLS settings clears the filled password. Passwords are cleared from the login field after testing; the active server context keeps what it needs in memory. Unchecking Remember password removes the saved credential after the next successful test. Forget saved profile removes both saved profile and credential. A failed test preserves the previous saved profile. A storage failure reports incomplete saving and never falls back to plaintext; a successful SQL test can still start the server. Same-user applications may access generic Windows credentials; secure storage is not protection from a compromised OS account.
+
+## Desktop lifecycle and reconnection
+
+Stop MCP server asks for confirmation. Closing DevLens asks separately and stops the server once. Cancel/Escape/closing the dialog leaves it running. After Stop, return to setup and test again to restart. The first page credits ChatGPT and OpenAI; Help: connect to ChatGPT Desktop is available on every page.
+
+The plugin runs `SqlServerDevLens.McpHost.dll --desktop` as a persistent official-SDK stdio server, with protocol-only stdout and stderr logging. Each tool call opens a fresh current-user-only named-pipe MCP session to the desktop. There is no TCP listener, Azure endpoint or OpenAI API key. Up to 16 desktop MCP sessions are supported; only one DevLens instance can own the endpoint.
+
+The plugin discovers its tools even before DevLens starts. While stopped/busy/unreachable, status returns `desktop_unavailable`, `adapterStatus: ready` and null last-test fields; SQL tools return an MCP error. A five-second connection/handshake budget bounds initial desktop attachment. After DevLens starts, the next call reconnects automatically. There is no background retry loop or cached success. **The native ChatGPT status stop/start/recovery cycle was verified before adding SQL tools.** Plugin upgrades still need one app restart to refresh discovery. The procedure tools in this version require a new desktop build and plugin 0.6.1.
+
+When running with SQL configured, expect `sqlConfigured: true`, `sqlConnected: false`, selected `database` and `lastSqlTestSucceeded: true`. `sqlConnected: false` describes the absence of a persistent SQL session; it is not a live connectivity probe. Standalone host invocation without `--desktop` intentionally remains an isolated status-only smoke test.
+
+## Pull and run in Visual Studio 2026
+
+Install Visual Studio 2026 with .NET desktop development and .NET 10 SDK. In your existing clone:
+
+```powershell
+git fetch origin
+git switch master
+git pull --ff-only origin master
 dotnet restore SqlServerDevLens.slnx
-dotnet run --project SqlServerDevLens.Desktop/SqlServerDevLens.Desktop.csproj
+dotnet build SqlServerDevLens.slnx -c Release
+dotnet test SqlServerDevLens.slnx -c Release --no-build
 ```
 
-**Expected result today:** the SQL Server DevLens startup screen opens with two options: **SQL Server Only** (default) or **SQL Server + Postman**. Selecting a mode and clicking **Continue** shows a connection-setup placeholder; **Back** returns to the mode selector. Database login and MCP functionality are not implemented yet.
+For a new clone: `git clone https://github.com/santanucompacct/SqlServerDevLens-MCP.git`, then enter that directory. The default branch is `master`.
 
-You can also open `SqlServerDevLens.slnx` in Visual Studio 2026, set `SqlServerDevLens.Desktop` as the startup project, and press **F5**.
+Open `SqlServerDevLens.slnx`, set `SqlServerDevLens.Desktop` as startup project and press F5. Enter a single database and use Test Connection. Keep encryption enabled and certificate trust disabled when a valid certificate is available. Trust server certificate intentionally bypasses validation for a self-signed test server. Leave DevLens showing Running. Never put credentials in chats, source, JSON or command arguments.
 
-## Repository structure
+## Publish/install and test the local plugin
 
-```text
-SqlServerDevLens-MCP/
-├── SqlServerDevLens.Desktop/   # Avalonia desktop app and functional startup screen
-├── SqlServerDevLens.slnx       # .NET solution
-├── README.md
-└── LICENSE.txt
+From the repository root in PowerShell 7:
+
+```powershell
+dotnet build SqlServerDevLens.slnx -c Release
+./scripts/Test-Mcp.ps1
+dotnet publish SqlServerDevLens.McpHost -c Release --no-self-contained -o plugins/sql-server-devlens/server
+./scripts/Test-Mcp.ps1 -HostDll ./plugins/sql-server-devlens/server/SqlServerDevLens.McpHost.dll
+# Once the updated desktop is Running:
+./scripts/Test-Mcp.ps1 -Desktop -HostDll ./plugins/sql-server-devlens/server/SqlServerDevLens.McpHost.dll
+# Refresh the installed local plugin after publishing:
+codex plugin add sql-server-devlens@devlens-local
 ```
 
-Planned future modules include a shared core/configuration library, SQL inspection engine, MCP host, optional Postman adapter, and API/database testing engine. These are *not yet present* in the repository.
+The ignored published server folder must exist before installation. This is framework-dependent and requires .NET 10. Do not launch using dotnet run, which can pollute stdout. The smoke script checks initialize/tools/list/status and non-JSON stdout; it does not query SQL.
 
-## Roadmap
+Open the repository as a local Work/Codex project in ChatGPT Desktop. Its `.agents/plugins/marketplace.json` provides DevLens Local. Install/enable SQL Server DevLens in the Plugins Directory if not already installed, or use the CLI refresh above. Fully restart ChatGPT once after upgrading. Local-plugin availability depends on account, app and workspace policy. The help window uses Plus or higher as the supported DevLens setup, not a universal OpenAI minimum; check [official plan details](https://learn.chatgpt.com/docs/pricing).
 
-- [x] Create the public MIT-licensed repository and runnable Avalonia/.NET 10 starter application.
-- [x] **v0.1 (part 1)** — Startup mode selection and Continue/Back navigation.
-- [ ] **v0.1 (part 2)** — Single-database SQL Server connection manager.
-- [ ] **v0.2** — Read-only SQL metadata tools and MCP integration.
-- [ ] **v0.3** — Optional Postman collection management.
-- [ ] **v0.4** — API execution, response assertions, and database verification.
-- [ ] **v0.5** — Test reports and automation support.
-- [ ] **v1.0** — Cross-platform packaging, documentation, and stable release.
+Retain both portable manifests and `.codex-plugin/plugin.json` compatibility manifest, with matching versions. The tested loader needs the compatibility manifest's `mcpServers` path and the portable files' Agent Plugins `$schema` fields to resolve `${PLUGIN_ROOT}` correctly. Inspect `codex mcp get sql-server-devlens --json` if discovery or launch fails. Edit source and reinstall; never modify the installed cache directly. See [official plugin packaging](https://developers.openai.com/plugins/build/plugins) and [desktop stdio configuration](https://developers.openai.com/plugins/deploy/desktop-only).
 
-Roadmap items describe intended work, not shipped features or guaranteed dates. Compatibility with specific AI assistants and ChatGPT subscription tiers will be verified during integration testing.
+In this chat, test in order:
 
-## Security principles
+1. “Call get_server_status from SQL Server DevLens.” Expect running, sqlConfigured true and your selected database.
+2. “Show the connected database details and list its tables.”
+3. “Describe dbo.YourTable.” Substitute an actual table/schema from the list.
+4. “Run SELECT 1 AS connection_verified through SQL Server DevLens.”
+5. Request a small read-only query against an approved table. Check truncation flags. Writes/USE/multiple statements should return validation errors.
+6. Stop DevLens, ask for status, restart/test SQL, then ask again without restarting ChatGPT. SQL calls should reconnect too.
 
-- Never commit SQL passwords, connection profiles containing sensitive host details, API tokens, or customer data.
-- Store passwords in an operating system credential store or other approved secure secret storage—not as plaintext in JSON.
-- Default to read-only SQL permissions and narrowly scoped metadata/data inspection tools; avoid unrestricted SQL execution.
-- Limit access to the explicitly selected database and enforce permissions at the **SQL Server account** level, not only in the UI.
-- Use encrypted connections where supported and make certificate validation explicit.
-- Keep API write tests separate from production databases. Require authorization, isolate fixtures, and validate both successful and failed transactions.
-- Restrict tool inputs, command execution, and local MCP endpoint access.
+## Validation and limits
 
-## Contributing
+Tests cover profile/credential handling; native Windows Credential Manager round trips with fake disposable secrets; headless confirmation/help/navigation; real named-pipe and stdio MCP discovery/forwarding; concurrency, Stop/restart and reconnection; argument forwarding, context disposal; and parser acceptance/rejection cases. No test writes to your SQL database.
 
-Issues, feature suggestions, documentation improvements, and pull requests are welcome. For larger changes, please open an issue first so the proposal can be discussed. Keep contributions generic and free of customer-specific code, credentials, or data.
+An explicit opt-in live test uses the current user's existing saved profile and Credential Manager entry, never printing either. It reads database metadata, checks bounded synthetic SELECT results/nulls/large text/binary handling/cancellation, and runs SELECT 1 plus a rejected write through a real stdio adapter and desktop pipe. To run locally only:
 
-## License
+```powershell
+$env:DEVLENS_TEST_SAVED_PROFILE='1'
+dotnet test SqlServerDevLens.slnx -c Release --filter FullyQualifiedName~LiveSqlTests
+Remove-Item Env:DEVLENS_TEST_SAVED_PROFILE
+```
 
-Licensed under the [MIT License](LICENSE.txt). Postman and other optional third-party tools remain subject to their own licenses and terms.
+Normal CI skips this live test and has no SQL credentials. GitHub Actions restores/builds/tests and checks stdio on Windows, Ubuntu and macOS; inspect the PR checks for the current commit. Automated adapter verification does not prove that a newly installed ChatGPT client has refreshed its tool list; native SQL tool discovery/calling must be checked after the user upgrades/restarts.
 
----
+## Structure and future work
 
-Created and maintained as an open-source initiative. Follow this repository for progress as the SQL, MCP, and API testing components are developed.
+- Desktop: Avalonia UI and active connection lifecycle.
+- Core: safe profiles/credentials, SqlClient operations and ScriptDom validation.
+- Runtime: desktop-owned MCP tools, pipe lifecycle and reconnecting client.
+- McpHost: persistent plugin stdio adapter or standalone smoke host.
+- Tests: unit, transport, UI and opt-in live SQL verification.
+- plugins / .agents: local package and marketplace; scripts: protocol smoke test.
+
+Future work: additional read-only schema details/pagination, broader carefully reviewed SQL support, macOS/Linux secure storage, installers and optional Postman integration. Procedures may write data only through the explicit approval workflow. Approved table INSERT/UPDATE and selected schema changes are supported as described above. DELETE/DROP/TRUNCATE, unrestricted writes and automatic migrations are outside this milestone.
+
+Licensed under [MIT](LICENSE.txt). Third-party tools retain their own licenses.

@@ -1,0 +1,13 @@
+{
+  "name": "sql-server-devlens",
+  "version": "0.6.1",
+  "description": "SQL exploration and explicitly desktop-approved procedure/table actions, transactional INSERT/UPDATE and private schema backups. Postman planned.",
+  "mcpServers": "./mcp.json",
+  "interface": {
+    "displayName": "SQL Server DevLens",
+    "shortDescription": "SQL exploration and approved changes",
+    "developerName": "Santanu Das",
+    "category": "Productivity",
+    "defaultPrompt": "Check SQL Server DevLens status, then list the selected database objects."
+  }
+}
