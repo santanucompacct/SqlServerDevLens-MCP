@@ -57,3 +57,28 @@ Confirm that this is the procedure currently called by the application and
 provide the expected create/edit JSON contracts (fake data only). Then prepare
 the complete header/detail/flight refactor as a separate reviewed SQL change
 and validate it in a disposable/test database before any production deployment.
+
+## Follow-up: sp_rep_requisition_register
+
+At the user's request, the complete 25,628-character definition of
+dbo.sp_rep_requisition_register was also read through the adapter in bounded
+chunks and retained only in the private local review directory. It handles
+inter-department **production** requisitions, not outlet requisitions. Its main
+sources are dbo.txn_production_requisition, dbo.txn_stock_transfer and
+dbo.txn_production_planning_req_proc; it never references the three outlet
+tables. Catalog checks confirmed the main transaction-table columns used in
+the inspected joins/projections are present. This is source/catalog inspection,
+not proof of successful execution or business correctness.
+
+The procedure exposes twelve report modes covering dashboard/register/detail,
+planning/department/product summaries, issue history, source/BOM tracing,
+alerts and department selection/list/detail. It derives pending/partial/full
+status from requested and issued quantities and matches transfers in the
+reverse route. It reads business tables and builds temporary working tables;
+no business-table INSERT/UPDATE/DELETE or nested procedure execution was found.
+The current SELECT-only DevLens tool intentionally does not execute it.
+
+No change to this report procedure is proposed from this inspection alone.
+Confirm outlet versus production workflow and the specific expected result
+before preparing a behavior-changing SQL patch. The legacy outlet findings
+above must not be applied to this separate reporting procedure.
