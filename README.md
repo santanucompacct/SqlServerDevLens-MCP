@@ -2,7 +2,9 @@
 
 **Your SQL Server, understood by AI.** MIT-licensed .NET 10 / Avalonia desktop application with owl branding.
 
-## Current milestone: one database, SQL exploration and approved procedures
+## Version 0.6.1: SQL exploration and approved procedure/table actions
+
+Completed: inspect table structure/data and procedure definitions; execute procedures with parameters and multiple result sets; create/modify procedures; create tables, add/alter columns, insert rows and update rows. Every procedure execution/change and table write requires explicit approval in DevLens. See [release notes](CHANGELOG.md) for verified coverage and limits. Postman integration is the next planned milestone and is not implemented.
 
 Choose SQL Server Only or SQL Server + Postman, then enter a TCP host, port (default 1433), one required database, SQL or Windows authentication, and TLS settings. Encryption defaults on; trust-server-certificate defaults off. Named instances must be resolved to a TCP port. Windows authentication uses the process identity; macOS/Linux require configured Kerberos. **Postman is planned and inactive in both modes.**
 
@@ -84,14 +86,14 @@ Install Visual Studio 2026 with .NET desktop development and .NET 10 SDK. In you
 
 ```powershell
 git fetch origin
-git switch feature/sql-login-mcp-status
-git pull --ff-only origin feature/sql-login-mcp-status
+git switch master
+git pull --ff-only origin master
 dotnet restore SqlServerDevLens.slnx
 dotnet build SqlServerDevLens.slnx -c Release
 dotnet test SqlServerDevLens.slnx -c Release --no-build
 ```
 
-For a new clone: `git clone https://github.com/santanucompacct/SqlServerDevLens-MCP.git`, then enter that directory. After PR merge use master instead of the feature branch.
+For a new clone: `git clone https://github.com/santanucompacct/SqlServerDevLens-MCP.git`, then enter that directory. The default branch is `master`.
 
 Open `SqlServerDevLens.slnx`, set `SqlServerDevLens.Desktop` as startup project and press F5. Enter a single database and use Test Connection. Keep encryption enabled and certificate trust disabled when a valid certificate is available. Trust server certificate intentionally bypasses validation for a self-signed test server. Leave DevLens showing Running. Never put credentials in chats, source, JSON or command arguments.
 
