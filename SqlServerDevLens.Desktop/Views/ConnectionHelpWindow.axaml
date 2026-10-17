@@ -16,9 +16,13 @@
                     </StackPanel>
                 </Border>
                 <TextBlock Text="1. Start DevLens" FontSize="17" FontWeight="SemiBold" />
-                <TextBlock Text="Choose a mode, enter your SQL Server details and select Test Connection. After a successful test, leave the MCP server screen showing Running." TextWrapping="Wrap" />
+                <TextBlock Text="SQL Server Only: Test Connection, then leave the server Running. SQL Server + Postman: test SQL, enter the API key locally, load/select a workspace, load/select a collection, then Start MCP Server. Both modes use the same plugin." TextWrapping="Wrap" />
                 <TextBlock Text="2. Prepare the local plugin (once)" FontSize="17" FontWeight="SemiBold" />
-                <TextBlock Text="For this source-code release, follow the README's Test the local MCP plugin instructions. They publish the server files and register/install the DevLens Local marketplace. If your developer already installed the plugin, continue to step 3." TextWrapping="Wrap" />
+                <TextBlock Text="Open the repository as a local Work/Codex project. In Plugins choose DevLens Local → SQL Server DevLens → Install/Enable. If Plugins → + / Add offers a setup prompt, use the text below after replacing the folder placeholder. If Add asks for an MCP URL, cancel: DevLens uses local stdio. The full guide includes build/publish/install steps. If already installed, skip this setup." TextWrapping="Wrap" />
+                <Border Background="#192941" CornerRadius="8" Padding="14">
+                    <SelectableTextBlock x:Name="SetupPrompt" Text="Set up the existing SQL Server DevLens local plugin from &lt;FULL_LOCAL_REPOSITORY_PATH&gt;. Follow its README to build/publish the .NET 10 stdio adapter and install/enable sql-server-devlens@devlens-local from DevLens Local. Preserve the existing plugin identity and marketplace entries. Do not create a hosted connector or ask for credentials in chat. Tell me any manual/restart steps, then call get_server_status and report the actual result. Do not execute SQL or application requests during setup." TextWrapping="Wrap" Foreground="#7DD3FC" />
+                </Border>
+                <Button Content="Copy setup prompt" Tag="SetupPrompt" Click="CopyPrompt_Click" />
                 <TextBlock Text="3. Enable SQL Server DevLens" FontSize="17" FontWeight="SemiBold" />
                 <TextBlock Text="In the ChatGPT desktop app, use a chat running on this computer in Work or Codex. Install or enable SQL Server DevLens from DevLens Local when available. After first installation or a plugin update, fully restart ChatGPT Desktop. After installation, the updated plugin can stay connected even while DevLens is stopped." TextWrapping="Wrap" />
                 <TextBlock Text="4. Check the connection" FontSize="17" FontWeight="SemiBold" />
@@ -26,8 +30,20 @@
                     <SelectableTextBlock Text="Call get_server_status from SQL Server DevLens." TextWrapping="Wrap" Foreground="#7DD3FC" />
                 </Border>
                 <TextBlock Text="Expect running, sqlConfigured: true and lastSqlTestSucceeded: true. sqlConnected: false means no persistent SQL connection. Ask to list objects, describe a table or read a procedure. Procedure actions, supported table changes, INSERT and UPDATE open a DevLens approval window. Review the exact SQL or parameters; Reject is the default. Approvals expire after five minutes and allow only that exact action once. SQL Server + Postman adds secure API-key setup, workspace/collection selection and metadata tools. Postman changes and HTTP runs require a separate DevLens approval. No scripts, environments, Vault or uploads are supported." TextWrapping="Wrap" />
+                <TextBlock Text="5. Start SQL work in an existing chat" FontSize="17" FontWeight="SemiBold" />
+                <TextBlock Text="Use a locally executed desktop chat with the installed plugin enabled. Type @ and select SQL Server DevLens when offered, then paste a prompt below. Prompts cannot grant tool access or switch DevLens mode." TextWrapping="Wrap" />
+                <Border Background="#192941" CornerRadius="8" Padding="14">
+                    <SelectableTextBlock x:Name="SqlPrompt" Text="Use the installed SQL Server DevLens plugin for SQL-only work in this chat. First call get_server_status and confirm the running server, successful SQL test and selected database. Start with read-only inspection of that database. Prepare procedure executions and SQL changes for approval in DevLens; wait for my approval there before applying. Do not use Postman tools or expose credentials. If the tools are unavailable, tell me clearly." TextWrapping="Wrap" Foreground="#7DD3FC" />
+                </Border>
+                <Button Content="Copy SQL-only prompt" Tag="SqlPrompt" Click="CopyPrompt_Click" />
+                <TextBlock Text="6. Start SQL + Postman work in an existing chat" FontSize="17" FontWeight="SemiBold" />
+                <Border Background="#192941" CornerRadius="8" Padding="14">
+                    <SelectableTextBlock x:Name="CombinedPrompt" Text="Use the installed SQL Server DevLens plugin for SQL and Postman work in this chat. Call get_server_status and get_postman_selection; confirm the database, workspace, collection and whether Postman execution is enabled. Work only within that selection. Begin with read-only inspection. Prepare each procedure execution, SQL change, Postman change or HTTP run for separate DevLens approval and wait for my approval there. Do not expose credentials or automatically retry uncertain actions. If tools/setup are missing, explain what is required." TextWrapping="Wrap" Foreground="#7DD3FC" />
+                </Border>
+                <Button Content="Copy SQL + Postman prompt" Tag="CombinedPrompt" Click="CopyPrompt_Click" />
                 <TextBlock Text="If the tool is missing" FontSize="17" FontWeight="SemiBold" />
-                <TextBlock Text="Confirm DevLens is Running and the plugin is installed/enabled. After changing DevLens code, rebuild and restart DevLens, then test SQL again. With plugin 0.3.4 or newer, desktop_unavailable means start DevLens, test SQL until Running and ask for status again. The next call reconnects automatically; no ChatGPT restart is needed for a DevLens restart. Never put SQL passwords in a chat, plugin configuration or JSON file." TextWrapping="Wrap" />
+                <TextBlock Text="Confirm local execution, DevLens Running and plugin selection. Restart ChatGPT once after first installation or an adapter upgrade. If an existing chat still cannot see the tools, start a new local chat with the plugin and bring over the relevant context. A prompt cannot guarantee activation in every existing chat. For desktop_unavailable, restart/setup DevLens and ask for status again; ordinary server restarts reconnect automatically. Start DevLens without debugging (Ctrl+F5) for large Postman collections. Never put credentials in chat or plugin JSON." TextWrapping="Wrap" />
+                <Button Content="Full connection guide and prompts" Click="Guide_Click" />
                 <StackPanel Orientation="Horizontal" Spacing="12">
                     <Button Content="Project README" Click="Readme_Click" />
                     <Button Content="OpenAI plan details" Click="Plans_Click" />

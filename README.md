@@ -4,6 +4,8 @@
 
 ## Version 0.8.1: server activity panel
 
+First-time setup or starting work in an existing chat: **[Connection guide and copyable SQL / SQL + Postman prompts](docs/CONNECTING-TO-CHATGPT.md)**. The in-app Help window includes Copy buttons for these prompts.
+
 Completed: inspect table structure/data and procedure definitions; execute procedures with parameters and multiple result sets; create/modify procedures; create tables, add/alter columns, insert rows and update rows. Every procedure execution/change and table write requires explicit approval in DevLens. See [release notes](CHANGELOG.md) for verified coverage and limits. Postman setup, selected-collection metadata and explicitly approved folder/request creation, editing and supported HTTP execution are available.
 
 Choose SQL Server Only or SQL Server + Postman, then enter a TCP host, port (default 1433), one required database, SQL or Windows authentication, and TLS settings. Encryption defaults on; trust-server-certificate defaults off. Named instances must be resolved to a TCP port. Windows authentication uses the process identity; macOS/Linux require configured Kerberos. **SQL Server Only starts MCP after SQL succeeds. SQL Server + Postman continues to key, workspace and collection setup before starting MCP.**
@@ -129,7 +131,7 @@ dotnet test SqlServerDevLens.slnx -c Release --no-build
 
 For a new clone: `git clone https://github.com/santanucompacct/SqlServerDevLens-MCP.git`, then enter that directory. The default branch is `master`.
 
-Open `SqlServerDevLens.slnx`, set `SqlServerDevLens.Desktop` as startup project and press F5. Enter a single database and use Test Connection. Keep encryption enabled and certificate trust disabled when a valid certificate is available. Trust server certificate intentionally bypasses validation for a self-signed test server. Leave DevLens showing Running. Never put credentials in chats, source, JSON or command arguments.
+Open `SqlServerDevLens.slnx`, set `SqlServerDevLens.Desktop` as startup project and start without debugging (Ctrl+F5). Enter a single database and use Test Connection. Keep encryption enabled and certificate trust disabled when a valid certificate is available. Trust server certificate intentionally bypasses validation for a self-signed test server. Leave DevLens showing Running. Never put credentials in chats, source, JSON or command arguments.
 
 ## Publish/install and test the local plugin
 

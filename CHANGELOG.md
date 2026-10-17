@@ -2,6 +2,8 @@
 
 ## 0.8.1 — Server activity panel (2026-10-17)
 
+- Added a connection help file, first-time local-plugin setup prompt and separate existing-chat SQL-only/SQL + Postman prompts. In-app Help includes Copy buttons and a full-guide link, with local execution/discovery limitations explained.
+
 - Kept the existing server panel, with scrollable information and Stop/Back controls on the left and a latest-first activity log on the right.
 - Added request numbers, serving/completed/failed/cancelled states, elapsed time, approval decisions and server lifecycle events. Completion records tool-call completion, not proof of an applied change.
 - Kept only 200 events in desktop memory, with no SQL/arguments/credentials/bodies/results/raw errors in the log and no disk/stdout logging. UI notification failures do not change tool outcomes.
