@@ -30,13 +30,13 @@ public partial class ServerViewModel : ViewModelBase
     }
     partial void OnIsRunningChanged(bool value) { OnPropertyChanged(nameof(CanStop)); OnPropertyChanged(nameof(CanReturn)); }
     partial void OnIsBusyChanged(bool value) { OnPropertyChanged(nameof(CanStop)); OnPropertyChanged(nameof(CanReturn)); }
-    public async Task StartAsync(ConnectionProfile profile, string notice, string? password = null, PostmanSelection? postman = null)
+    public async Task StartAsync(ConnectionProfile profile, string notice, string? password = null, PostmanSelection? postman = null, string? postmanKey = null)
     {
         IsBusy = true; Status = "Starting MCP server…";
         ConnectionSummary = $"{profile.Host}:{profile.Port} / {profile.Database}";
         ConnectionNotice = notice;
         PostmanSummary = postman is null ? "Postman disabled — SQL Server Only."
-            : $"Postman: {postman.Workspace.Name} / {postman.Collection.Name} — {postman.Requests.Length} requests. Metadata only; API execution is not enabled.";
+            : $"Postman: {postman.Workspace.Name} / {postman.Collection.Name} — {postman.Requests.Length} startup requests. Changes and HTTP runs require explicit approval in DevLens.";
         try
         {
             var database = new SqlDatabase(profile, password, (request, decision, token) =>
@@ -44,8 +44,11 @@ public partial class ServerViewModel : ViewModelBase
                 if (RequestProcedureReview is null) { decision(false); return; }
                 RequestProcedureReview(request, decision, token);
             });
-            try { await _server.StartAsync(DateTimeOffset.UtcNow, database, postman); }
-            catch { database.Dispose(); throw; }
+            PostmanWorkflow? postmanActions = postman is not null && !string.IsNullOrEmpty(postmanKey)
+                ? new PostmanWorkflow(new PostmanActionBackend(postmanKey, postman), (request, decision, token) =>
+                    { if(RequestProcedureReview is null) { decision(false); return; } RequestProcedureReview(request, decision, token); }) : null;
+            try { await _server.StartAsync(DateTimeOffset.UtcNow, database, postman, postmanActions); }
+            catch { database.Dispose(); postmanActions?.Dispose(); throw; }
             IsRunning = _server.IsRunning;
             Status = IsRunning ? "Running — local MCP server is available" : "Server could not start. Test the connection again.";
             if (!IsRunning) await _server.StopAsync();

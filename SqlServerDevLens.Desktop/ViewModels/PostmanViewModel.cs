@@ -95,7 +95,7 @@ public partial class PostmanViewModel : ViewModelBase, IDisposable
             await _credentials.SaveAsync(CredentialId, key, token);
         }
         else if (CanRememberKey) await _credentials.DeleteAsync(CredentialId, token);
-        Status = "Postman collection validated. Request execution is not enabled in this milestone.";
+        Status = "Postman collection validated. Changes and HTTP runs require explicit approval in DevLens.";
         if (Ready is not null) await Ready(selection);
         ApiKey = "";
     });

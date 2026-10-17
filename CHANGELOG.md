@@ -1,5 +1,14 @@
 # Release notes
 
+## 0.8.0 — Desktop-approved Postman actions (2026-10-17)
+
+- Added live item IDs/masked request inspection plus separate prepare/status/apply/run MCP tools for the selected collection.
+- Added folder creation, request creation from an existing template and request name/header/raw-JSON edits. Existing URL/method/authentication are preserved; resource deletion and whole-collection replacement are unsupported.
+- Added one-request HTTP execution with shared collection variables and no-auth/header API-key/bearer authentication. Nonempty scripts/tests and unsupported environments/Vault/uploads are rejected explicitly.
+- DevLens shows masked before/proposed or resolved outgoing content for human approval. Approvals expire, are single-use and are cleared by Stop. Collection/variable/auth changes require a fresh approval. No automatic retry after an uncertain outcome.
+- Postman changes require a private owner-restricted collection backup and are read back. Runs use a separate HTTP client, block redirects and return bounded, known-secret-masked HTTP status/body. HTTP 200 does not imply business-level success.
+- SQL connection/query/procedure/table implementations are unchanged. Verification uses synthetic APIs plus SQL regressions; new live-account MCP approval remains a user rebuild/restart check. No real account writes or application requests are performed during development.
+
 ## 0.7.0 — Postman setup milestone (2026-10-17)
 
 - SQL Server + Postman now follows SQL test → masked API-key entry → Load Workspaces → workspace selection → Load Collections → collection selection → Start MCP Server.

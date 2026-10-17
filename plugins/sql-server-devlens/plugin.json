@@ -1,6 +1,6 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "sql-server-devlens",
-  "version": "0.7.0",
-  "description": "SQL exploration and explicitly desktop-approved procedure/table actions, transactional INSERT/UPDATE and private schema backups. Optional Postman workspace/collection setup and safe metadata tools; request execution is not enabled."
+  "version": "0.8.0",
+  "description": "SQL exploration and explicitly desktop-approved procedure/table actions, transactional INSERT/UPDATE and private schema backups. Optional Postman setup and desktop-approved folder/request creation, editing and HTTP execution."
 }

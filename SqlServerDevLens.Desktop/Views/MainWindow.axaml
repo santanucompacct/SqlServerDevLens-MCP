@@ -155,7 +155,7 @@
                                 <Button Content="Start MCP Server" Command="{Binding StartCommand}" Background="#2563EB" />
                             </StackPanel>
                             <TextBlock Text="{Binding Status}" Foreground="#7DD3FC" TextWrapping="Wrap" />
-                            <TextBlock Text="This step reads Postman metadata only. It does not execute requests, scripts or tests. Chat tools show request names/methods and variable names; variable values and API credentials are excluded." TextWrapping="Wrap" FontSize="12" />
+                            <TextBlock Text="Setup reads metadata only. Later folder/request changes and HTTP runs require a separate DevLens approval. Known secrets are masked in reviews and chat output. Scripts, environments, Vault and uploads are unsupported." TextWrapping="Wrap" FontSize="12" />
                         </StackPanel>
                         <Button Content="Back to SQL connection" Command="{Binding BackFromPostmanCommand}" IsEnabled="{Binding Postman.IsEditable}" />
                     </StackPanel>

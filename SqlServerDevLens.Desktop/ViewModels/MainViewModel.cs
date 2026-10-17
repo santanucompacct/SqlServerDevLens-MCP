@@ -48,7 +48,7 @@ public class MainViewModel : ViewModelBase
             var profile = _pendingProfile; var password = _pendingPassword;
             _pendingProfile = null; _pendingPassword = null;
             IsPostmanStepVisible = false; IsServerStepVisible = true;
-            await Server.StartAsync(profile, Connection.Status, password, selection);
+            await Server.StartAsync(profile, Connection.Status, password, selection, Postman.ApiKey);
         };
         ContinueCommand = new AsyncRelayCommand(async () => { await Connection.LoadAsync(); IsChoosingMode = false; });
         BackCommand = new RelayCommand(() => { Connection.Password = ""; IsChoosingMode = true; });

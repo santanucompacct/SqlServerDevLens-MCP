@@ -23,6 +23,8 @@ public class ConfirmationTests
     [InlineData(true, "procedure")]
     [InlineData(false, "table")]
     [InlineData(true, "table")]
+    [InlineData(false, "postman")]
+    [InlineData(true, "postman")]
     public Task ProcedureReviewRequiresHumanDecisionAndShowsExactSql(bool approve, string targetKind) => RunOnUi(async () =>
     {
         var owner = new Window(); owner.Show();
@@ -39,6 +41,12 @@ public class ConfirmationTests
         {
             Assert.Equal("Current schema metadata", dialog.FindControl<TabItem>("BeforeTab")!.Header);
             Assert.Contains("NOT table rows", dialog.FindControl<TextBlock>("Scope")!.Text);
+        }
+        if(targetKind == "postman")
+        {
+            Assert.Equal("Current request (masked)",dialog.FindControl<TabItem>("BeforeTab")!.Header);
+            Assert.Contains("Secrets are masked",dialog.FindControl<TextBlock>("Scope")!.Text);
+            Assert.Contains("Collection:",dialog.FindControl<TextBlock>("Scope")!.Text);
         }
         dialog.FindControl<Button>(approve ? "ApproveAction" : "RejectAction")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Assert.Equal(approve, await decision); owner.Close();
@@ -138,7 +146,7 @@ public class ConfirmationTests
         public bool IsRunning { get; private set; }
         public int StopCount;
         public event Action? StoppedUnexpectedly { add { } remove { } }
-        public Task StartAsync(DateTimeOffset sqlTestedAt, SqlServerDevLens.Core.ISqlDatabase? database = null, SqlServerDevLens.Core.PostmanSelection? postman = null) { IsRunning = true; return Task.CompletedTask; }
+        public Task StartAsync(DateTimeOffset sqlTestedAt, SqlServerDevLens.Core.ISqlDatabase? database = null, SqlServerDevLens.Core.PostmanSelection? postman = null, SqlServerDevLens.Core.PostmanWorkflow? postmanActions = null) { IsRunning = true; return Task.CompletedTask; }
         public Task StopAsync() { IsRunning = false; StopCount++; return Task.CompletedTask; }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }

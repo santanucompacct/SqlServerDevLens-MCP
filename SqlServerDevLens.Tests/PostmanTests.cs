@@ -149,7 +149,7 @@ public class PostmanTests
     {
         public bool IsRunning { get; private set; } public PostmanSelection? Selection;
         public event Action? StoppedUnexpectedly { add {} remove {} }
-        public Task StartAsync(DateTimeOffset at, ISqlDatabase? db = null, PostmanSelection? postman = null) { Selection = postman; IsRunning = true; db?.Dispose(); return Task.CompletedTask; }
+        public Task StartAsync(DateTimeOffset at, ISqlDatabase? db = null, PostmanSelection? postman = null, PostmanWorkflow? postmanActions = null) { Selection = postman; IsRunning = true; db?.Dispose(); return Task.CompletedTask; }
         public Task StopAsync() { IsRunning = false; return Task.CompletedTask; }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }

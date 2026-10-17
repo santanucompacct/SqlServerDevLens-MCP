@@ -10,7 +10,7 @@ public interface IDesktopMcpServer : IAsyncDisposable
 {
     bool IsRunning { get; }
     event Action? StoppedUnexpectedly;
-    Task StartAsync(DateTimeOffset sqlTestedAt, ISqlDatabase? database = null, PostmanSelection? postman = null);
+    Task StartAsync(DateTimeOffset sqlTestedAt, ISqlDatabase? database = null, PostmanSelection? postman = null, PostmanWorkflow? postmanActions = null);
     Task StopAsync();
 }
 
@@ -31,6 +31,7 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
     private CancellationTokenSource? _shutdown;
     private Task? _acceptLoop;
     private ISqlDatabase? _database;
+    private PostmanWorkflow? _postmanActions;
     private McpServerTool[] _tools = [];
     private volatile bool _isRunning;
     public bool IsRunning => _isRunning;
@@ -41,16 +42,17 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
         PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly |
         (firstInstance ? PipeOptions.FirstPipeInstance : PipeOptions.None));
 
-    public async Task StartAsync(DateTimeOffset sqlTestedAt, ISqlDatabase? database = null, PostmanSelection? postman = null)
+    public async Task StartAsync(DateTimeOffset sqlTestedAt, ISqlDatabase? database = null, PostmanSelection? postman = null, PostmanWorkflow? postmanActions = null)
     {
         await _lifecycle.WaitAsync();
         try
         {
             if (_shutdown is not null) throw new InvalidOperationException("Server is already started.");
-            var tools = CreateTools(database, sqlTestedAt, postman);
+            var tools = CreateTools(database, sqlTestedAt, postman, postmanActions);
             // Reserve the endpoint exclusively, allowing multiple instances owned by this server.
             _listener = CreateListener(firstInstance: true);
             _database = database;
+            _postmanActions = postmanActions;
             _tools = tools;
             _shutdown = new CancellationTokenSource();
             _isRunning = true;
@@ -94,6 +96,7 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
             _isRunning = false;
             _shutdown!.Cancel();
             _database?.Dispose(); _database = null;
+            _postmanActions?.Dispose(); _postmanActions = null;
             Session[] active;
             lock (_sessionGate) active = _sessions.ToArray();
             foreach (var session in active) session.Pipe.Dispose();
@@ -126,18 +129,18 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
         }
     }
 
-    private static McpServerTool[] CreateTools(ISqlDatabase? database, DateTimeOffset testedAt, PostmanSelection? postman) =>
+    private static McpServerTool[] CreateTools(ISqlDatabase? database, DateTimeOffset testedAt, PostmanSelection? postman, PostmanWorkflow? postmanActions) =>
     [
         McpServerTool.Create(() => new
         {
             service = "SQL Server DevLens MCP", status = "running", transport = "desktop-pipe",
             sqlConfigured = database is not null, sqlConnected = false, database = database?.Database,
             lastSqlTestSucceeded = true, lastSqlTestUtc = testedAt, postmanImplemented = true,
-            postmanConfigured = postman is not null, postmanRequestExecutionEnabled = false,
-            message = "SQL connections open per operation and are disposed. SQL actions require desktop approval. Postman supports selected-collection metadata only; API execution is not enabled."
+            postmanConfigured = postman is not null, postmanRequestExecutionEnabled = postmanActions is not null,
+            message = "SQL connections open per operation and are disposed. SQL actions and Postman changes/runs require explicit desktop approval."
         }, new() { Name = "get_server_status", Description = "Returns desktop server state and last SQL test; does not query SQL." }),
         ..new DatabaseTools(database).CreateTools(), ..new ProcedureTools(database?.Procedures).CreateTools(),
-        ..new PostmanTools(postman).CreateTools()
+        ..new PostmanTools(postman, postmanActions).CreateTools()
     ];
 
     public async Task StopAsync()
@@ -148,6 +151,7 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
             if (_shutdown is null) return;
             _isRunning = false;
             _shutdown.Cancel();
+            _postmanActions?.Dispose(); _postmanActions = null;
             NamedPipeServerStream? listener;
             Session[] active;
             lock (_sessionGate)

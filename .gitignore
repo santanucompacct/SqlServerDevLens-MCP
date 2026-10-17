@@ -388,3 +388,4 @@ Thumbs.db
 plugins/*/server/
 **/ProcedureBackups/
 **/TableSchemaBackups/
+**/PostmanBackups/

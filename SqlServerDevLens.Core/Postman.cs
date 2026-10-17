@@ -46,13 +46,14 @@ public sealed class PostmanClient : IPostmanClient, IDisposable
         if (result.Length > 300 || result.Any(char.IsControl)) throw new InvalidOperationException("Postman metadata exceeds the display limits.");
         return result;
     }
-    private async Task<JsonDocument> GetAsync(string key, string path, CancellationToken token)
+    internal async Task<JsonDocument> GetAsync(string key, string path, CancellationToken token, HttpMethod? method = null, string? json = null)
     {
         if (string.IsNullOrWhiteSpace(key) || key.Length > 1280 || key.Any(c => c < '!' || c > '~'))
             throw new ArgumentException("Enter a valid Postman API key without spaces.");
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(_baseUri, path));
+            using var request = new HttpRequestMessage(method ?? HttpMethod.Get, new Uri(_baseUri, path));
+            if (json is not null) request.Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
             request.Headers.Add("X-API-Key", key);
             using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
             if (!response.IsSuccessStatusCode)
