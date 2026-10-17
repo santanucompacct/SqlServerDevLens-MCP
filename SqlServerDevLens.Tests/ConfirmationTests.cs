@@ -23,6 +23,8 @@ public class ConfirmationTests
     [InlineData(true, "procedure")]
     [InlineData(false, "table")]
     [InlineData(true, "table")]
+    [InlineData(false, "postman")]
+    [InlineData(true, "postman")]
     public Task ProcedureReviewRequiresHumanDecisionAndShowsExactSql(bool approve, string targetKind) => RunOnUi(async () =>
     {
         var owner = new Window(); owner.Show();
@@ -39,6 +41,12 @@ public class ConfirmationTests
         {
             Assert.Equal("Current schema metadata", dialog.FindControl<TabItem>("BeforeTab")!.Header);
             Assert.Contains("NOT table rows", dialog.FindControl<TextBlock>("Scope")!.Text);
+        }
+        if(targetKind == "postman")
+        {
+            Assert.Equal("Current request (masked)",dialog.FindControl<TabItem>("BeforeTab")!.Header);
+            Assert.Contains("Secrets are masked",dialog.FindControl<TextBlock>("Scope")!.Text);
+            Assert.Contains("Collection:",dialog.FindControl<TextBlock>("Scope")!.Text);
         }
         dialog.FindControl<Button>(approve ? "ApproveAction" : "RejectAction")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Assert.Equal(approve, await decision); owner.Close();
@@ -133,12 +141,54 @@ public class ConfirmationTests
         Assert.True(help.IsVisible); help.Close(); owner.Close();
     });
 
+    [Theory]
+    [InlineData(680)]
+    [InlineData(880)]
+    [InlineData(1280)]
+    public Task ActivityPanelStaysBesideServerInformationAndUpdatesOnUiThread(int width) => RunOnUi(async () =>
+    {
+        var runtime = new FakeServer();
+        var connection = new ConnectionViewModel(new SuccessfulTester(), new EmptyProfiles(), new UnavailableCredentialStore())
+            { Host = "localhost", Database = "Example", WindowsAuthentication = true };
+        var model = new MainViewModel(connection, new ServerViewModel(runtime));
+        var window = new MainWindow { DataContext = model, Width = width,
+            ConfirmActionAsync = (_, _, _) => Task.FromResult(true) };
+        await model.ContinueCommand.ExecuteAsync(null);
+        await connection.TestConnectionCommand.ExecuteAsync(null);
+        window.Show();
+        await Task.Run(() => runtime.Activity.Add("#1 get_server_status", "Serving", "Request received."));
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        Assert.True(model.IsServerStepVisible);
+        Assert.Single(model.Server.ActivityEntries);
+        var columns = window.FindControl<Grid>("ServerColumns")!;
+        Assert.True(columns.Bounds.Width > 400);
+        Assert.Equal(2, columns.Children.Count);
+        Assert.Equal(columns.Children[0].Bounds.Width, columns.Children[1].Bounds.Width, 1);
+        Assert.True(columns.Children[1].Bounds.X > columns.Children[0].Bounds.Right);
+        Assert.Equal(340, window.FindControl<ScrollViewer>("ActivityScroll")!.Bounds.Height);
+        window.Close();
+    });
+
+    private sealed class SuccessfulTester : IConnectionTester
+    {
+        public Task<ConnectionTestResult> TestAsync(ConnectionProfile profile, string? password, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ConnectionTestResult(true, "Connected."));
+    }
+    private sealed class EmptyProfiles : IProfileStore
+    {
+        public Task<ConnectionProfile?> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult<ConnectionProfile?>(null);
+        public Task SaveAsync(ConnectionProfile profile, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task DeleteAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
     private sealed class FakeServer : IDesktopMcpServer
     {
+        public ServerActivityLog Activity { get; } = new();
         public bool IsRunning { get; private set; }
         public int StopCount;
         public event Action? StoppedUnexpectedly { add { } remove { } }
-        public Task StartAsync(DateTimeOffset sqlTestedAt, SqlServerDevLens.Core.ISqlDatabase? database = null) { IsRunning = true; return Task.CompletedTask; }
+        public Task StartAsync(DateTimeOffset sqlTestedAt, SqlServerDevLens.Core.ISqlDatabase? database = null, SqlServerDevLens.Core.PostmanSelection? postman = null, SqlServerDevLens.Core.PostmanWorkflow? postmanActions = null) { IsRunning = true; return Task.CompletedTask; }
         public Task StopAsync() { IsRunning = false; StopCount++; return Task.CompletedTask; }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }

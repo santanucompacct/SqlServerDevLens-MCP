@@ -1,8 +1,8 @@
-param([string]$HostDll = "$PSScriptRoot/../SqlServerDevLens.McpHost/bin/Release/net10.0/SqlServerDevLens.McpHost.dll", [switch]$Desktop, [switch]$ExpectUnavailable)
+param([string]$HostDll = "$PSScriptRoot/../SqlServerDevLens.McpHost/bin/Release/net10.0/SqlServerDevLens.McpHost.dll", [string]$HostExe, [switch]$Desktop, [switch]$ExpectUnavailable)
 $Desktop = $Desktop -or $ExpectUnavailable
 $ErrorActionPreference = 'Stop'
-$start = [System.Diagnostics.ProcessStartInfo]::new('dotnet')
-$start.ArgumentList.Add([System.IO.Path]::GetFullPath($HostDll))
+$start = [System.Diagnostics.ProcessStartInfo]::new($(if ($HostExe) { [IO.Path]::GetFullPath($HostExe) } else { 'dotnet' }))
+if (-not $HostExe) { $start.ArgumentList.Add([System.IO.Path]::GetFullPath($HostDll)) }
 if ($Desktop) { $start.ArgumentList.Add('--desktop') }
 $start.UseShellExecute = $false
 $start.CreateNoWindow = $true

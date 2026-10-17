@@ -3,6 +3,31 @@ on: [push, pull_request]
 permissions:
   contents: read
 jobs:
+  postman-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --global postman-cli@1.73.0
+      - name: Verify client against local synthetic Postman control API
+        shell: bash
+        run: |
+          postman simulation run postman/simulations/setup.sim.yaml --port 4917 --output ndjson --no-history > "$RUNNER_TEMP/postman-sim.ndjson" 2> "$RUNNER_TEMP/postman-sim.err" &
+          trap 'pkill -INT -f "simulation run postman/simulations/setup.sim.yaml" || true' EXIT
+          for attempt in $(seq 1 40); do
+            if grep -q '"event":"listening"' "$RUNNER_TEMP/postman-sim.ndjson"; then break; fi
+            sleep 1
+          done
+          grep -q '"event":"listening"' "$RUNNER_TEMP/postman-sim.ndjson"
+          export DEVLENS_POSTMAN_SIMULATION_URL=http://127.0.0.1:4917/postman/
+          dotnet test SqlServerDevLens.slnx -c Release --filter FullyQualifiedName~RealHttpClientAgainstPostmanSimulation
+          grep -q '"event":"request"' "$RUNNER_TEMP/postman-sim.ndjson"
   build:
     strategy:
       matrix:

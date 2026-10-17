@@ -1,0 +1,7 @@
+simulation: devlens-postman-setup
+routing: path
+mocks:
+  - routeKey: postman
+    path: ../mocks/postman-control.js
+  - routeKey: actions
+    path: ../mocks/postman-actions.js

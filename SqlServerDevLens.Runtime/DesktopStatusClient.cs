@@ -40,10 +40,10 @@ public sealed class DesktopStatusClient(string? pipeName = null, TimeSpan? reque
                     service = "SQL Server DevLens MCP", status = "desktop_unavailable", adapterStatus = "ready",
                     transport = "stdio", sqlConfigured = false, sqlConnected = false,
                     lastSqlTestSucceeded = (bool?)null, lastSqlTestUtc = (DateTimeOffset?)null,
-                    postmanImplemented = false,
-                    outcomeUnknown = name is "execute_prepared_procedure" or "apply_procedure_change" or "apply_table_sql",
-                    message = name is "execute_prepared_procedure" or "apply_procedure_change" or "apply_table_sql"
-                        ? "Connection lost or operation timed out. The approved action may already have committed. Verify database state; do not retry automatically. The request may have been consumed."
+                    postmanImplemented = true, postmanConfigured = (bool?)null, postmanRequestExecutionEnabled = (bool?)null,
+                    outcomeUnknown = name is "execute_prepared_procedure" or "apply_procedure_change" or "apply_table_sql" or "apply_postman_change" or "run_prepared_postman_request",
+                    message = name is "execute_prepared_procedure" or "apply_procedure_change" or "apply_table_sql" or "apply_postman_change" or "run_prepared_postman_request"
+                        ? "Connection lost or operation timed out. The approved action may already have committed. Verify database/application/Postman state; do not retry automatically. The request may have been consumed."
                         : "DevLens is stopped, restarting, busy or unreachable. Start DevLens and test SQL until Running, then call this tool again. The plugin remains connected and reconnects to DevLens on each call."
                 }) }]
             };

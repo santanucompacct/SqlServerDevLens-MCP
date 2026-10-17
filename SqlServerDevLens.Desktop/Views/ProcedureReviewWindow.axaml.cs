@@ -28,6 +28,14 @@ public partial class ProcedureReviewWindow : Window
             " SQL Server permissions apply. External changes can race with the final revision check.";
         ReviewText.Text = review.Action == "execute" ? review.Parameters : review.Diff;
         BeforeText.Text = review.Before; AfterText.Text = review.Proposed;
+        if(review.TargetKind == "postman")
+        {
+            Title = "Review Postman action";
+            Heading.Text = $"Review Postman {review.Action}: {review.Name}";
+            ReviewTab.Header = "Action and scope"; BeforeTab.Header = "Current request (masked)"; AfterTab.Header = "Proposed / outgoing request (masked)";
+            Scope.Text = $"Collection: {review.Database}. Expires: {review.ExpiresAt.ToLocalTime():HH:mm:ss}. " +
+                "Review destination, method, headers and body. Secrets are masked; exact values remain in desktop memory. This permits one exact action. Any HTTP method can have side effects. Changes save a private collection backup; runs do not back up remote data. Responses are shared with chat with known secrets masked and output limits. No scripts, environments, Vault, redirects or automatic retries. External edits can race after the revision check.";
+        }
     }
     private void Reject_Click(object? sender, RoutedEventArgs e) => Close(false);
     private void Approve_Click(object? sender, RoutedEventArgs e) => Close(DateTimeOffset.UtcNow < _expires);

@@ -23,8 +23,20 @@ public class ServerTests
         Assert.True(server.IsRunning);
         await CheckStatus(name, testedAt, timeout.Token);
         await CheckStatus(name, testedAt, timeout.Token);
+        var activity = server.Activity.Snapshot();
+        Assert.Equal(2, activity.Count(e => e.State == "Serving"));
+        Assert.Equal(2, activity.Count(e => e.State == "Completed"));
+        Assert.Contains("get_server_status", activity[0].Operation);
+        Assert.Equal("Completed", activity[0].State);
+        var rejected = await new DesktopStatusClient(name).CallAsync("query_read_only",
+            new Dictionary<string, object?> { ["sql"] = "SELECT 'PRIVATE-SENTINEL'", ["maxRows"] = 1 }, timeout.Token);
+        Assert.True(rejected.IsError);
+        activity = server.Activity.Snapshot();
+        Assert.Equal("Failed", activity[0].State);
+        Assert.DoesNotContain("PRIVATE-SENTINEL", string.Join("\n", activity.Select(e => e.ToString())));
         await server.StopAsync();
         Assert.False(server.IsRunning);
+        Assert.Equal("Stopped", server.Activity.Snapshot()[0].State);
         await using (var absent = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous))
             await Assert.ThrowsAsync<TimeoutException>(() => absent.ConnectAsync(150));
         await server.StartAsync(testedAt);
@@ -37,7 +49,7 @@ public class ServerTests
         await pipe.ConnectAsync(cancellationToken);
         await using var client = await McpClient.CreateAsync(new StreamClientTransport(pipe, pipe), cancellationToken: cancellationToken);
         var tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
-        Assert.Equal(14, tools.Count); Assert.Contains(tools, t => t.Name == "get_server_status");
+        Assert.Equal(23, tools.Count); Assert.Contains(tools, t => t.Name == "get_server_status");
         var result = await client.CallToolAsync("get_server_status", cancellationToken: cancellationToken);
         var text = Assert.IsType<TextContentBlock>(result.Content[0]).Text;
         var status = JsonDocument.Parse(text).RootElement;
@@ -82,7 +94,7 @@ public class ServerTests
             Command = "dotnet", Arguments = [dll, "--desktop", "--pipe-name", name]
         }), cancellationToken: timeout.Token);
         var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-        Assert.Equal(14, tools.Count);
+        Assert.Equal(23, tools.Count);
         var result = await client.CallToolAsync("get_server_status", cancellationToken: timeout.Token);
         Assert.NotEmpty(result.Content);
         await server.StopAsync();
@@ -154,9 +166,10 @@ public class ServerTests
     private sealed class FakeServer : IDesktopMcpServer
     {
         public bool FailStartup;
+        public ServerActivityLog Activity { get; } = new();
         public bool IsRunning { get; private set; }
         public event Action? StoppedUnexpectedly { add { } remove { } }
-        public Task StartAsync(DateTimeOffset sqlTestedAt, SqlServerDevLens.Core.ISqlDatabase? database = null)
+        public Task StartAsync(DateTimeOffset sqlTestedAt, SqlServerDevLens.Core.ISqlDatabase? database = null, SqlServerDevLens.Core.PostmanSelection? postman = null, SqlServerDevLens.Core.PostmanWorkflow? postmanActions = null)
         { if (FailStartup) throw new IOException(); IsRunning = true; return Task.CompletedTask; }
         public Task StopAsync() { IsRunning = false; return Task.CompletedTask; }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
