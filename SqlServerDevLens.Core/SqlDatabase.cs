@@ -11,6 +11,7 @@ public sealed record SqlResult(string Database, IReadOnlyList<SqlColumn> Columns
 public interface ISqlDatabase : IDisposable
 {
     string Database { get; }
+    ProcedureWorkflow? Procedures => null;
     Task<SqlResult> GetDatabaseInfoAsync(CancellationToken cancellationToken);
     Task<SqlResult> ListObjectsAsync(CancellationToken cancellationToken);
     Task<SqlResult> DescribeObjectAsync(string schema, string name, CancellationToken cancellationToken);
@@ -24,17 +25,22 @@ public sealed class SqlDatabase : ISqlDatabase
     private readonly CancellationTokenSource _stopped = new();
     private readonly SemaphoreSlim _operations = new(4, 4);
     public string Database { get; }
-    public SqlDatabase(ConnectionProfile profile, string? password)
+    public ProcedureWorkflow Procedures { get; }
+    public SqlDatabase(ConnectionProfile profile, string? password,
+        Action<ProcedureReview, Action<bool>, CancellationToken>? review = null)
     {
         Database = profile.Database.Trim();
         var builder = new SqlConnectionStringBuilder(SqlConnectionTester.BuildConnectionString(profile, password))
         { Pooling = false, ApplicationIntent = ApplicationIntent.ReadOnly };
         _connectionString = builder.ConnectionString;
+        Procedures = new ProcedureWorkflow(new SqlProcedureBackend(Database,
+            () => _connectionString ?? throw new InvalidOperationException("SQL context is stopped.")), review);
     }
     public void Dispose()
     {
         Interlocked.Exchange(ref _connectionString, null);
         _stopped.Cancel();
+        Procedures.Dispose();
     }
 
     public Task<SqlResult> GetDatabaseInfoAsync(CancellationToken cancellationToken) => ExecuteAsync(

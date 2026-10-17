@@ -19,6 +19,7 @@ public partial class ServerViewModel : ViewModelBase
     [ObservableProperty] private string _connectionNotice = "";
     public bool CanStop => IsRunning && !IsBusy;
     public bool CanReturn => !IsRunning && !IsBusy;
+    public Action<ProcedureReview, Action<bool>, System.Threading.CancellationToken>? RequestProcedureReview { get; set; }
     public ServerViewModel() : this(new DesktopMcpServer()) { }
     public ServerViewModel(IDesktopMcpServer server)
     {
@@ -35,7 +36,11 @@ public partial class ServerViewModel : ViewModelBase
         ConnectionNotice = notice;
         try
         {
-            var database = new SqlDatabase(profile, password);
+            var database = new SqlDatabase(profile, password, (request, decision, token) =>
+            {
+                if (RequestProcedureReview is null) { decision(false); return; }
+                RequestProcedureReview(request, decision, token);
+            });
             try { await _server.StartAsync(DateTimeOffset.UtcNow, database); }
             catch { database.Dispose(); throw; }
             IsRunning = _server.IsRunning;

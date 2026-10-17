@@ -31,6 +31,7 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
     private CancellationTokenSource? _shutdown;
     private Task? _acceptLoop;
     private ISqlDatabase? _database;
+    private McpServerTool[] _tools = [];
     private volatile bool _isRunning;
     public bool IsRunning => _isRunning;
     public event Action? StoppedUnexpectedly;
@@ -46,9 +47,11 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
         try
         {
             if (_shutdown is not null) throw new InvalidOperationException("Server is already started.");
+            var tools = CreateTools(database, sqlTestedAt);
             // Reserve the endpoint exclusively, allowing multiple instances owned by this server.
             _listener = CreateListener(firstInstance: true);
             _database = database;
+            _tools = tools;
             _shutdown = new CancellationTokenSource();
             _isRunning = true;
             _acceptLoop = AcceptAsync(_listener, sqlTestedAt, _shutdown.Token);
@@ -109,13 +112,7 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
         {
             await using var server = McpServer.Create(new StreamServerTransport(session.Pipe, session.Pipe), new McpServerOptions
             {
-                ToolCollection = [McpServerTool.Create(() => new
-                {
-                    service = "SQL Server DevLens MCP", status = "running", transport = "desktop-pipe",
-                    sqlConfigured = _database is not null, sqlConnected = false, database = _database?.Database, lastSqlTestSucceeded = true, lastSqlTestUtc = sqlTestedAt,
-                    postmanImplemented = false,
-                    message = "SQL connections open per operation and are disposed. Read-only tools use the selected database; no persistent SQL session. Postman is not implemented."
-                }, new() { Name = "get_server_status", Description = "Returns the desktop-controlled MCP server status and last SQL test time; does not query SQL." }), ..new DatabaseTools(_database).CreateTools()]
+                ToolCollection = [.._tools]
             });
             await server.RunAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -128,6 +125,18 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
             lock (_sessionGate) _sessions.Remove(session);
         }
     }
+
+    private static McpServerTool[] CreateTools(ISqlDatabase? database, DateTimeOffset testedAt) =>
+    [
+        McpServerTool.Create(() => new
+        {
+            service = "SQL Server DevLens MCP", status = "running", transport = "desktop-pipe",
+            sqlConfigured = database is not null, sqlConnected = false, database = database?.Database,
+            lastSqlTestSucceeded = true, lastSqlTestUtc = testedAt, postmanImplemented = false,
+            message = "SQL connections open per operation and are disposed. Procedure actions require explicit desktop approval. Postman is not implemented."
+        }, new() { Name = "get_server_status", Description = "Returns desktop server state and last SQL test; does not query SQL." }),
+        ..new DatabaseTools(database).CreateTools(), ..new ProcedureTools(database?.Procedures).CreateTools()
+    ];
 
     public async Task StopAsync()
     {
@@ -151,6 +160,7 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
             lock (_sessionGate) pending = _sessions.Select(session => session.Completion).ToArray();
             await Task.WhenAll(pending).ConfigureAwait(false);
             _database?.Dispose(); _database = null;
+            _tools = [];
             _shutdown.Dispose(); _shutdown = null; _listener = null; _acceptLoop = null;
         }
         finally { _lifecycle.Release(); }

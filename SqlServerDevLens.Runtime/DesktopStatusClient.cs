@@ -17,13 +17,13 @@ public sealed class DesktopStatusClient(string? pipeName = null, TimeSpan? reque
         CancellationToken cancellationToken = default)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(requestTimeout ?? TimeSpan.FromSeconds(name == "get_server_status" ? 3 : 35));
+        timeout.CancelAfter(requestTimeout ?? TimeSpan.FromSeconds(name == "get_server_status" ? 5 : 35));
         try
         {
             await using var pipe = new NamedPipeClientStream(".", pipeName ?? DesktopMcpServer.DefaultPipeName,
                 PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
             using var handshake = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token);
-            handshake.CancelAfter(requestTimeout ?? TimeSpan.FromSeconds(3));
+            handshake.CancelAfter(requestTimeout ?? TimeSpan.FromSeconds(5));
             await pipe.ConnectAsync(handshake.Token).ConfigureAwait(false);
             await using var client = await McpClient.CreateAsync(new StreamClientTransport(pipe, pipe),
                 cancellationToken: handshake.Token).ConfigureAwait(false);
@@ -41,7 +41,10 @@ public sealed class DesktopStatusClient(string? pipeName = null, TimeSpan? reque
                     transport = "stdio", sqlConfigured = false, sqlConnected = false,
                     lastSqlTestSucceeded = (bool?)null, lastSqlTestUtc = (DateTimeOffset?)null,
                     postmanImplemented = false,
-                    message = "DevLens is stopped, restarting, busy or unreachable. Start DevLens and test SQL until Running, then call this tool again. The plugin remains connected and reconnects to DevLens on each call."
+                    outcomeUnknown = name is "execute_prepared_procedure" or "apply_procedure_change",
+                    message = name is "execute_prepared_procedure" or "apply_procedure_change"
+                        ? "Connection lost or operation timed out. The approved action may already have committed. Verify database state; do not retry automatically. The request may have been consumed."
+                        : "DevLens is stopped, restarting, busy or unreachable. Start DevLens and test SQL until Running, then call this tool again. The plugin remains connected and reconnects to DevLens on each call."
                 }) }]
             };
         }

@@ -18,3 +18,24 @@ jobs:
       - run: dotnet test SqlServerDevLens.slnx -c Release --no-build
       - run: ./scripts/Test-Mcp.ps1
         shell: pwsh
+  procedure-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Start disposable localhost SQL Server
+        shell: bash
+        run: |
+          CI_SQL_PASSWORD="Dvl-$(openssl rand -hex 24)-1!"
+          echo "::add-mask::$CI_SQL_PASSWORD"
+          docker run -d --name devlens-test-sql -p 127.0.0.1:1433:1433 -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e MSSQL_SA_PASSWORD="$CI_SQL_PASSWORD" mcr.microsoft.com/mssql/server:2022-latest
+          echo "DEVLENS_PROCEDURE_TEST_CONNECTION_STRING=Server=127.0.0.1,1433;User ID=sa;Password=$CI_SQL_PASSWORD;Encrypt=True;TrustServerCertificate=True;Connect Timeout=3" >> "$GITHUB_ENV"
+          echo "DEVLENS_PROCEDURE_TEST_ALLOW_DATABASE_CREATE=1" >> "$GITHUB_ENV"
+      - run: dotnet build SqlServerDevLens.slnx -c Release
+      - run: dotnet test SqlServerDevLens.slnx -c Release --no-build --filter FullyQualifiedName~DisposableProcedureIntegrationTests
+      - name: Stop disposable SQL Server
+        if: always()
+        run: docker rm -f devlens-test-sql

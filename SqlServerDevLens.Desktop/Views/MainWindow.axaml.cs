@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using System;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using SqlServerDevLens.Desktop.ViewModels;
 
 namespace SqlServerDevLens.Desktop.Views;
@@ -11,10 +12,24 @@ public partial class MainWindow : Window
     private bool _shutdownComplete;
     private bool _actionInProgress;
     private ConnectionHelpWindow? _helpWindow;
+    private ProcedureReviewWindow? _procedureReview;
     public Func<string, string, string, Task<bool>>? ConfirmActionAsync { private get; set; }
     public MainWindow()
     {
         InitializeComponent();
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is MainViewModel model)
+                model.Server.RequestProcedureReview = (request, decision, token) => Dispatcher.UIThread.Post(async () =>
+                {
+                    if (_actionInProgress || _procedureReview is not null || !IsVisible || token.IsCancellationRequested) { decision(false); return; }
+                    var dialog = new ProcedureReviewWindow(request); _procedureReview = dialog;
+                    using var cancelled = token.Register(() => Dispatcher.UIThread.Post(() => dialog.Close(false)));
+                    try { decision(await dialog.ShowDialog<bool>(this)); }
+                    catch { decision(false); }
+                    finally { _procedureReview = null; }
+                });
+        };
         Closing += async (_, e) =>
         {
             if (_shutdownComplete || DataContext is not MainViewModel model) return;

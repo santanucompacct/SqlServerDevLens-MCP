@@ -1,0 +1,28 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="SqlServerDevLens.Desktop.Views.ProcedureReviewWindow"
+        Width="950" Height="700" MinWidth="700" MinHeight="450"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="#111C30" RequestedThemeVariant="Dark" Title="Review procedure action">
+    <Grid Margin="22" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="14">
+        <TextBlock x:Name="Heading" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock x:Name="Scope" Grid.Row="1" TextWrapping="Wrap" Foreground="#CBD5E1" />
+        <TabControl Grid.Row="2">
+            <TabItem Header="Exact diff / Parameters">
+                <TextBox x:Name="ReviewText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" FontFamily="Consolas,monospace"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" />
+            </TabItem>
+            <TabItem Header="Current definition">
+                <TextBox x:Name="BeforeText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" FontFamily="Consolas,monospace"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" />
+            </TabItem>
+            <TabItem Header="Proposed definition">
+                <TextBox x:Name="AfterText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" FontFamily="Consolas,monospace"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" />
+            </TabItem>
+        </TabControl>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+            <Button x:Name="RejectAction" Content="Reject" IsDefault="True" IsCancel="True" Click="Reject_Click" Padding="20,10" />
+            <Button x:Name="ApproveAction" Content="Approve this action once" Click="Approve_Click" Background="#B91C1C" Foreground="White" Padding="20,10" />
+        </StackPanel>
+    </Grid>
+</Window>

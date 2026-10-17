@@ -18,6 +18,25 @@ public class HeadlessAppBuilder
 
 public class ConfirmationTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task ProcedureReviewRequiresHumanDecisionAndShowsExactSql(bool approve) => RunOnUi(async () =>
+    {
+        var owner = new Window(); owner.Show();
+        var review = new ProcedureReview("fake-request", "FakeDatabase", "dbo", "Example", "alter",
+            "CREATE PROC dbo.Example AS SELECT 1", "ALTER PROC dbo.Example AS SELECT 2",
+            "-SELECT 1\n+SELECT 2", "", DateTimeOffset.UtcNow.AddMinutes(5));
+        var dialog = new ProcedureReviewWindow(review);
+        var decision = dialog.ShowDialog<bool>(owner);
+        Assert.True(dialog.FindControl<Button>("RejectAction")!.IsDefault);
+        Assert.Equal(review.Diff, dialog.FindControl<TextBox>("ReviewText")!.Text);
+        Assert.Equal(review.Before, dialog.FindControl<TextBox>("BeforeText")!.Text);
+        Assert.Equal(review.Proposed, dialog.FindControl<TextBox>("AfterText")!.Text);
+        dialog.FindControl<Button>(approve ? "ApproveAction" : "RejectAction")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.Equal(approve, await decision); owner.Close();
+    });
+
     private static async Task RunOnUi(Func<Task> action)
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(HeadlessAppBuilder));
