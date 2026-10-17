@@ -21,7 +21,7 @@ If SQL Server DevLens is already installed and working, skip to section 2. Both 
 ### Copy this setup prompt
 
 ```text
-Set up the existing SQL Server DevLens local plugin from <FULL_LOCAL_REPOSITORY_PATH> on this computer. Read its README and use its existing plugins/sql-server-devlens package and DevLens Local marketplace. Build and publish the .NET 10 stdio adapter following the repository instructions, then install/enable sql-server-devlens@devlens-local using the supported local-plugin workflow. Preserve the plugin identity and existing marketplace entries. Do not create a hosted connector or ask for SQL passwords or Postman API keys in chat. Tell me any restart or manual installation steps that remain. Finally, call get_server_status from SQL Server DevLens and report the actual result; do not claim success if its tools are unavailable. Do not execute SQL or application requests during setup.
+Set up the existing SQL Server DevLens local plugin from <FULL_LOCAL_REPOSITORY_PATH> on this computer. Read its README and plugins/sql-server-devlens/INSTALL.md. Use its existing plugin package and DevLens Local marketplace. Build/publish the .NET 10 stdio adapter and install/enable sql-server-devlens@devlens-local using the supported local-plugin workflow. Include the bundled skills/devlens-workflow folder and its references/agents metadata. Preserve the plugin identity and other marketplace entries. Verify the installed version, enabled plugin and discovery of sql-server-devlens:devlens-workflow. Do not create a separate skill or hosted connector, or ask for credentials in chat. Tell me any restart/manual steps that remain. After DevLens setup, call get_server_status and report the actual result; do not claim success if tools or skill are unavailable. Do not execute SQL or application requests during setup.
 ```
 
 This is a request for the assistant to perform local setup, not a magic activation command. It depends on available installation tools and local-folder access. A prompt alone cannot grant plugin permissions or install a plugin in an unsupported chat.
@@ -33,6 +33,10 @@ After first installation or an adapter upgrade, fully quit/reopen ChatGPT Deskto
 OpenAI documents [local marketplaces and installation](https://developers.openai.com/plugins/build/plugins#install-a-local-plugin-manually), [desktop-only stdio plugins](https://developers.openai.com/plugins/deploy/desktop-only) and [using installed plugins](https://learn.chatgpt.com/docs/plugins). These establish the local workflow; the setup prompt above is DevLens-specific guidance.
 
 ## 2. Use SQL only in an existing chat
+
+### Sharing with another user/account
+
+Give the recipient the source-project link or a complete prepared plugin plus the compatible DevLens desktop application. **[Installation instructions are included inside the plugin](../plugins/sql-server-devlens/INSTALL.md)**, including a recipient setup prompt, manual commands, required package contents and skill-discovery checks. Installing the whole plugin brings its skill along automatically. The recipient does not recreate the skill or copy this conversation. They enable/verify the plugin in their local host and enter their own authorized SQL/Postman details. An account using an existing correct installation can verify/enable it rather than making duplicate copies.
 
 Plugin **0.8.2** includes the **DevLens SQL and Postman** skill (`devlens-workflow`). The host can choose it for relevant DevLens tasks. You can explicitly select it in the skill picker; Codex can display the plugin-qualified name `sql-server-devlens:devlens-workflow`. Select the entry shown by your host. If it is missing, update/reinstall the plugin and restart ChatGPT once. The prompts below also work as ordinary instructions; they cannot force a missing skill or tool to load. Installing on a different account does not copy your business rules or credentials.
 

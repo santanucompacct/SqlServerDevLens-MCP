@@ -1,5 +1,11 @@
 # Release notes
 
+## 0.8.3 — Recipient installation instructions (2026-10-17)
+
+- Included INSTALL.md inside the plugin, with another-user/account setup prompt, source-build/local-marketplace commands, prebuilt-package contents and tools/skill verification.
+- Updated the connection guide's creation prompt to preserve and verify the bundled workflow skill. Installing the complete plugin supplies the skill; recipients do not recreate it or share credentials.
+- Documentation/package update only; desktop and SQL/Postman implementations are unchanged.
+
 ## 0.8.2 — Bundled DevLens workflow skill (2026-10-17)
 
 - Packaged `devlens-workflow` with focused SQL/Postman references and skill-picker metadata. Relevant tasks may select it automatically; explicit selection is also supported by the host.

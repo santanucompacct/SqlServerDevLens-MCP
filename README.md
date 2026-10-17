@@ -2,9 +2,11 @@
 
 **Your SQL Server, understood by AI.** MIT-licensed .NET 10 / Avalonia desktop application with owl branding.
 
-## Version 0.8.2: bundled SQL and Postman workflow skill
+## Version 0.8.3: installation guide included in the plugin
 
 First-time setup or starting work in an existing chat: **[Connection guide and copyable SQL / SQL + Postman prompts](docs/CONNECTING-TO-CHATGPT.md)**. The in-app Help window includes Copy buttons for these prompts.
+
+Sharing with another user/account: the plugin now includes **[INSTALL.md](plugins/sql-server-devlens/INSTALL.md)** with a recipient setup prompt, source/prebuilt installation paths and checks that both the tools and bundled skill are discovered. Share the whole package; the application EXE alone does not install the skill. The full connection guide's setup prompt includes these checks.
 
 Plugin 0.8.2 bundles **[devlens-workflow](plugins/sql-server-devlens/skills/devlens-workflow/SKILL.md)** with SQL and Postman references. It guides connection checks, tool choice, read-only inspection, exact-action desktop approval, verification and handling uncertain outcomes. Skill selection is enabled by default when relevant; explicitly select/invoke it if the host does not choose it. It does not transfer private business context or grant tools, database rights or approval.
 
