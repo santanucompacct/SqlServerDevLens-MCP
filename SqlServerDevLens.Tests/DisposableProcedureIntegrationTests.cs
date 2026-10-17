@@ -17,6 +17,81 @@ public class ProcedureServerFactAttribute : FactAttribute
 public class DisposableProcedureIntegrationTests
 {
     [ProcedureServerFact]
+    public async Task RealTableCreateInsertUpdateAlterLimitsBackupAndSqlPermissions()
+    {
+        var builder = new SqlConnectionStringBuilder(Environment.GetEnvironmentVariable("DEVLENS_PROCEDURE_TEST_CONNECTION_STRING"));
+        Assert.Contains(builder.DataSource, new[] { "127.0.0.1,1433", "localhost,1433" });
+        builder.InitialCatalog = "master"; builder.Pooling = false;
+        var name = "DevLensTest_" + Guid.NewGuid().ToString("N");
+        var backupPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DevLensTestBackups", name);
+        var login = "dvl_test_" + Guid.NewGuid().ToString("N"); var loginCreated = false;
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        await using var admin = new SqlConnection(builder.ConnectionString);
+        for (var attempt = 0; ; attempt++)
+        {
+            try { await admin.OpenAsync(timeout.Token); break; }
+            catch (SqlException) when (attempt < 40) { await Task.Delay(1500, timeout.Token); }
+        }
+        await Command(admin, $"CREATE DATABASE [{name}]", timeout.Token);
+        try
+        {
+            builder.InitialCatalog = name;
+            var backend = new SqlProcedureBackend(name, () => builder.ConnectionString, tableBackups: new PrivateTableSchemaBackupStore(backupPath));
+            Action<bool>? decision = null;
+            using var workflow = new ProcedureWorkflow(backend, (_, approve, _) => decision = approve);
+            async Task<TableSqlResult> Run(string sql, int limit = 10)
+            {
+                var pending = await workflow.PrepareTableAsync("dbo", "Example", sql, limit, timeout.Token);
+                await Assert.ThrowsAsync<InvalidOperationException>(() => workflow.ApplyTableAsync(pending.RequestId, timeout.Token));
+                decision!(true);
+                return await workflow.ApplyTableAsync(pending.RequestId, timeout.Token);
+            }
+            Assert.Equal("committed", (await Run("CREATE TABLE dbo.Example(id int NOT NULL PRIMARY KEY, qty int NOT NULL CHECK(qty>=0), label nvarchar(50) NULL)")).Status);
+            Assert.Equal(2, (await Run("INSERT dbo.Example(id,qty,label) VALUES(1,0,N'one'),(2,0,N'two')", 2)).AffectedRows);
+            Assert.Equal(1, (await Run("UPDATE dbo.Example SET qty=qty+5 WHERE id=1", 1)).AffectedRows);
+            await Assert.ThrowsAsync<ArgumentException>(() => workflow.PrepareTableAsync("dbo", "Example", "UPDATE dbo.Example SET qty=1 WHERE id>0", 1, timeout.Token));
+            var drift = await workflow.PrepareTableAsync("dbo", "Example", "UPDATE dbo.Example SET qty=99 WHERE id>0", 2, timeout.Token); decision!(true);
+            await using var db = new SqlConnection(builder.ConnectionString); await db.OpenAsync(timeout.Token);
+            await Command(db, "INSERT dbo.Example(id,qty) VALUES(3,0)", timeout.Token);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => workflow.ApplyTableAsync(drift.RequestId, timeout.Token));
+            await using (var check = db.CreateCommand())
+            { check.CommandText = "SELECT qty FROM dbo.Example WHERE id=1"; Assert.Equal(5, await check.ExecuteScalarAsync(timeout.Token)); }
+            var failing = await workflow.PrepareTableAsync("dbo", "Example", "UPDATE dbo.Example SET qty=-1 WHERE id=1", 1, timeout.Token); decision(true);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => workflow.ApplyTableAsync(failing.RequestId, timeout.Token));
+            await using (var check = db.CreateCommand())
+            { check.CommandText = "SELECT qty FROM dbo.Example WHERE id=1"; Assert.Equal(5, await check.ExecuteScalarAsync(timeout.Token)); }
+            Assert.True((await Run("ALTER TABLE dbo.Example ADD extra int NULL")).SchemaBackupSaved);
+            var backup = await File.ReadAllTextAsync(Assert.Single(Directory.GetFiles(backupPath)), timeout.Token);
+            Assert.Contains("Catalog metadata only", backup); Assert.DoesNotContain("\"name\": \"extra\"", backup);
+            var stale = await workflow.PrepareTableAsync("dbo", "Example", "UPDATE dbo.Example SET qty=10 WHERE id=1", 1, timeout.Token); decision(true);
+            await Command(db, "ALTER TABLE dbo.Example ADD outside_change int NULL", timeout.Token);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => workflow.ApplyTableAsync(stale.RequestId, timeout.Token));
+            var blockedBackend = new SqlProcedureBackend(name, () => builder.ConnectionString, tableBackups: new FailedTableBackup());
+            var blocked = await blockedBackend.PrepareTableAsync(TableSql.Validate("dbo", "Example", "ALTER TABLE dbo.Example ADD never_added int NULL", 1), timeout.Token);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => blockedBackend.ApplyTableAsync(blocked, timeout.Token));
+            await using (var check = db.CreateCommand())
+            { check.CommandText = "SELECT COUNT(*) FROM sys.columns WHERE object_id=OBJECT_ID('dbo.Example') AND name='never_added'"; Assert.Equal(0, await check.ExecuteScalarAsync(timeout.Token)); }
+            // Even a desktop-approved action cannot bypass the SQL account's rights.
+            var password = "Dvl-" + Guid.NewGuid().ToString("N") + "-1!";
+            await Command(admin, $"CREATE LOGIN [{login}] WITH PASSWORD=N'{password}'", timeout.Token); loginCreated = true;
+            await Command(db, $"CREATE USER [{login}] FOR LOGIN [{login}]; GRANT SELECT ON dbo.Example TO [{login}]; GRANT VIEW DEFINITION ON OBJECT::dbo.Example TO [{login}]", timeout.Token);
+            var limited = new SqlConnectionStringBuilder(builder.ConnectionString) { UserID = login, Password = password, IntegratedSecurity = false };
+            using var restricted = new ProcedureWorkflow(new SqlProcedureBackend(name, () => limited.ConnectionString), (_, approve, _) => approve(true));
+            var denied = await restricted.PrepareTableAsync("dbo", "Example", "INSERT dbo.Example(id,qty) VALUES(4,0)", 1, timeout.Token);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => restricted.ApplyTableAsync(denied.RequestId, timeout.Token));
+            await using (var check = db.CreateCommand())
+            { check.CommandText = "SELECT COUNT(*) FROM dbo.Example WHERE id=4"; Assert.Equal(0, await check.ExecuteScalarAsync(timeout.Token)); }
+        }
+        finally
+        {
+            await Command(admin, $"ALTER DATABASE [{name}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{name}]", CancellationToken.None);
+            if (loginCreated) await Command(admin, $"DROP LOGIN [{login}]", CancellationToken.None);
+            if (Directory.Exists(backupPath)) Directory.Delete(backupPath, true);
+        }
+    }
+    private sealed class FailedTableBackup : ITableSchemaBackupStore
+    { public Task SaveAsync(string metadata, CancellationToken token) => throw new InvalidOperationException("Simulated table backup failure"); }
+    [ProcedureServerFact]
     public async Task RealCreateExecuteAlterBackupRevisionAndTruncation()
     {
         var builder = new SqlConnectionStringBuilder(Environment.GetEnvironmentVariable("DEVLENS_PROCEDURE_TEST_CONNECTION_STRING"));

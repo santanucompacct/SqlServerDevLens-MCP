@@ -14,6 +14,11 @@ public sealed class PrivateProcedureBackupStore(string? directory = null) : IPro
     public string DirectoryPath { get; } = directory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SqlServerDevLens", "ProcedureBackups");
     public async Task SaveAsync(string database, ProcedureDefinition previous, CancellationToken token)
     {
+        var header = $"-- Private pre-change backup. Revision {previous.Revision}\nSET ANSI_NULLS {(previous.AnsiNulls ? "ON" : "OFF")};\nSET QUOTED_IDENTIFIER {(previous.QuotedIdentifier ? "ON" : "OFF")};\nGO\n";
+        await SaveContentAsync(header + previous.Definition, ".sql", token);
+    }
+    internal async Task SaveContentAsync(string content, string extension, CancellationToken token)
+    {
         try
         {
             var full = Path.GetFullPath(DirectoryPath);
@@ -34,13 +39,12 @@ public sealed class PrivateProcedureBackupStore(string? directory = null) : IPro
                 Directory.CreateDirectory(full, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
                 File.SetUnixFileMode(full, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
             }
-            var file = Path.Combine(full, $"{DateTime.UtcNow:yyyyMMddTHHmmssfff}-{Guid.NewGuid():N}.sql");
+            var file = Path.Combine(full, $"{DateTime.UtcNow:yyyyMMddTHHmmssfff}-{Guid.NewGuid():N}{extension}");
             var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write,
                 Share = FileShare.None, Options = FileOptions.Asynchronous };
             if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
             await using var stream = new FileStream(file, options);
-            var header = $"-- Private pre-change backup. Revision {previous.Revision}\nSET ANSI_NULLS {(previous.AnsiNulls ? "ON" : "OFF")};\nSET QUOTED_IDENTIFIER {(previous.QuotedIdentifier ? "ON" : "OFF")};\nGO\n";
-            await stream.WriteAsync(Encoding.UTF8.GetBytes(header + previous.Definition), token);
+            await stream.WriteAsync(Encoding.UTF8.GetBytes(content), token);
             await stream.FlushAsync(token);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Security.SecurityException)

@@ -12,7 +12,7 @@ public sealed record ProcedureDefinition(string Schema, string Name, string Defi
 public sealed record ProcedureExecution(IReadOnlyList<SqlResult> ResultSets, IReadOnlyDictionary<string, object?> OutputParameters,
     int? ReturnCode, bool Completed, string Message, bool OutputValuesTruncated = false);
 public sealed record ProcedureReview(string RequestId, string Database, string Schema, string Name, string Action,
-    string Before, string Proposed, string Diff, string Parameters, DateTimeOffset ExpiresAt);
+    string Before, string Proposed, string Diff, string Parameters, DateTimeOffset ExpiresAt, string TargetKind = "procedure");
 public sealed record ProcedureRequestStatus(string RequestId, string Status, DateTimeOffset ExpiresAt, string Diff);
 public sealed record ProcedureApplyResult(string Status, bool BackupSaved);
 
@@ -33,13 +33,14 @@ public sealed class ProcedureWorkflow(IProcedureBackend backend,
     private readonly CancellationTokenSource _stopped = new();
     private readonly object _gate = new();
     private readonly Dictionary<string, Pending> _pending = new();
-    private sealed class Pending(ProcedureReview review, ProcedureDefinition? previous, string sql, string parameters)
+    private sealed class Pending(ProcedureReview review, ProcedureDefinition? previous, string sql, string parameters, TableSqlSnapshot? table = null)
     {
         public ProcedureReview Review { get; } = review;
         public ProcedureDefinition? Previous { get; } = previous;
         public string Sql { get; } = sql;
         public string Parameters { get; } = parameters;
         public string Status { get; set; } = "pending";
+        public TableSqlSnapshot? Table { get; } = table;
     }
     public async Task<ProcedureDefinition> ReadAsync(string schema, string name, CancellationToken token)
     {
@@ -62,16 +63,27 @@ public sealed class ProcedureWorkflow(IProcedureBackend backend,
         if (!create && previous is null) throw new ArgumentException("Procedure not found or not visible. Cannot safely update without the previous definition.");
         return Stage(schema, name, create ? "create" : "alter", previous, sql, "");
     }
-    private ProcedureRequestStatus Stage(string schema, string name, string action, ProcedureDefinition? previous, string sql, string parameters)
+    public async Task<ProcedureRequestStatus> PrepareTableAsync(string schema, string name, string sql, int maxRows, CancellationToken token)
+    {
+        if (backend is not ITableActionBackend tables) throw new InvalidOperationException("Table actions are unavailable in this server.");
+        var plan = TableSql.Validate(schema, name, sql, maxRows);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, _stopped.Token);
+        var snapshot = await tables.PrepareTableAsync(plan, linked.Token);
+        return Stage(schema, name, plan.Action, null, sql, "", snapshot);
+    }
+    private ProcedureRequestStatus Stage(string schema, string name, string action, ProcedureDefinition? previous, string sql, string parameters, TableSqlSnapshot? table = null)
     {
         _stopped.Token.ThrowIfCancellationRequested();
         if (review is null) throw new InvalidOperationException("Desktop approval is unavailable. No procedure action was prepared or executed.");
         var id = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
         var expires = _clock.GetUtcNow().AddMinutes(5);
-        var diff = action == "execute" ? "" : ProcedureSql.Diff(previous?.Definition ?? "", sql);
+        var before = table?.Metadata ?? previous?.Definition ?? "";
+        var diff = table is not null
+            ? $"Action: {action}\nMatching/insert rows: {table.MatchingRows}. Maximum direct rows: {table.Plan.MaxRows}.\n\nExact SQL:\n{sql}\n\nCurrent schema metadata (not a table-data backup):\n{before}"
+            : action == "execute" ? "" : ProcedureSql.Diff(before, sql);
         var request = new ProcedureReview(id, backend.Database, schema, name, action,
-            previous?.Definition ?? "", sql, diff, parameters, expires);
-        var pending = new Pending(request, previous, sql, parameters);
+            before, sql, diff, parameters, expires, table is null ? "procedure" : "table");
+        var pending = new Pending(request, previous, sql, parameters, table);
         lock (_gate)
         {
             _stopped.Token.ThrowIfCancellationRequested();
@@ -105,12 +117,14 @@ public sealed class ProcedureWorkflow(IProcedureBackend backend,
         if (_clock.GetUtcNow() >= pending.Review.ExpiresAt) { _pending.Remove(id); throw new ArgumentException("Request expired. Prepare and review again."); }
         return pending;
     }
-    private Pending Consume(string id, bool execute)
+    private Pending Consume(string id, string kind)
     {
         lock (_gate)
         {
             var pending = Find(id);
-            if ((pending.Review.Action == "execute") != execute) throw new ArgumentException("Request belongs to a different action.");
+            if (kind switch { "execute" => pending.Review.Action != "execute", "table" => pending.Table is null,
+                _ => pending.Table is not null || pending.Review.Action is not ("create" or "alter") })
+                throw new ArgumentException("Request belongs to a different action.");
             if (pending.Status != "approved") throw new InvalidOperationException("Explicit approval in DevLens is required. The action has not run.");
             _pending.Remove(id); // Consume before any SQL; a failure must never be replayed.
             return pending;
@@ -118,15 +132,21 @@ public sealed class ProcedureWorkflow(IProcedureBackend backend,
     }
     public async Task<ProcedureExecution> ExecuteAsync(string id, CancellationToken token)
     {
-        var pending = Consume(id, true);
+        var pending = Consume(id, "execute");
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, _stopped.Token);
         return await backend.ExecuteAsync(pending.Previous!, pending.Parameters, linked.Token);
     }
     public async Task<ProcedureApplyResult> ApplyAsync(string id, CancellationToken token)
     {
-        var pending = Consume(id, false);
+        var pending = Consume(id, "procedure_change");
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, _stopped.Token);
         return await backend.ApplyAsync(pending.Review.Schema, pending.Review.Name, pending.Sql, pending.Previous, linked.Token);
+    }
+    public async Task<TableSqlResult> ApplyTableAsync(string id, CancellationToken token)
+    {
+        var pending = Consume(id, "table");
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, _stopped.Token);
+        return await ((ITableActionBackend)backend).ApplyTableAsync(pending.Table!, linked.Token);
     }
     public void Dispose() { _stopped.Cancel(); lock (_gate) _pending.Clear(); }
 }

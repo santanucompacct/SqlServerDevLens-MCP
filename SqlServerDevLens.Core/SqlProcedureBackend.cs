@@ -5,8 +5,8 @@ using Microsoft.Data.SqlClient;
 
 namespace SqlServerDevLens.Core;
 
-public sealed class SqlProcedureBackend(string database, Func<string> connectionString,
-    IProcedureBackupStore? backups = null) : IProcedureBackend
+public sealed partial class SqlProcedureBackend(string database, Func<string> connectionString,
+    IProcedureBackupStore? backups = null, ITableSchemaBackupStore? tableBackups = null) : IProcedureBackend, ITableActionBackend
 {
     private readonly SemaphoreSlim _actions = new(1, 1);
     private readonly IProcedureBackupStore _backups = backups ?? new PrivateProcedureBackupStore();
@@ -28,7 +28,7 @@ public sealed class SqlProcedureBackend(string database, Func<string> connection
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
         timeout.CancelAfter(TimeSpan.FromSeconds(25));
         try { return await action(timeout.Token).ConfigureAwait(false); }
-        catch (SqlException error) { throw new InvalidOperationException($"SQL procedure operation failed (error {error.Number}). Check permissions, parameters and SQL. " + (mayWrite ? "Changes may already have committed. Verify state before preparing a retry." : "No action was applied.")); }
+        catch (SqlException error) { throw new InvalidOperationException($"SQL operation failed (error {error.Number}). Check permissions, parameters and SQL. " + (mayWrite ? "Changes may already have committed. Verify state before preparing a retry." : "No action was applied.")); }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
         { throw new InvalidOperationException("Procedure operation timed out. " + (mayWrite ? "Changes may already have committed. Verify state before preparing a retry." : "No action was applied.")); }
     }

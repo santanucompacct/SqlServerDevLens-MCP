@@ -383,3 +383,5 @@ Thumbs.db
 .idea/
 
 plugins/*/server/
+**/ProcedureBackups/
+**/TableSchemaBackups/

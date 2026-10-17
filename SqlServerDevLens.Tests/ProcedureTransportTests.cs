@@ -44,6 +44,19 @@ public class ProcedureTransportTests
         using var changeJson = JsonDocument.Parse(Assert.IsType<TextContentBlock>(change.Content[0]).Text);
         var changeId = changeJson.RootElement.GetProperty("requestId").GetString();
         decision(true);
+        var wrongAction = await client.CallToolAsync("apply_table_sql", new Dictionary<string, object?> { ["requestId"] = changeId }, cancellationToken: timeout.Token);
+        Assert.True(wrongAction.IsError);
+        var table = await client.CallToolAsync("prepare_table_sql", new Dictionary<string, object?>
+        { ["schema"] = "dbo", ["name"] = "Example", ["sql"] = "INSERT dbo.Example(id) VALUES(1)", ["maxAffectedRows"] = 1 }, cancellationToken: timeout.Token);
+        Assert.False(table.IsError ?? false);
+        using var tableJson = JsonDocument.Parse(Assert.IsType<TextContentBlock>(table.Content[0]).Text);
+        var tableArgs = new Dictionary<string, object?> { ["requestId"] = tableJson.RootElement.GetProperty("requestId").GetString(), ["approved"] = true };
+        var tableDenied = await client.CallToolAsync("apply_table_sql", tableArgs, cancellationToken: timeout.Token);
+        Assert.True(tableDenied.IsError); Assert.Equal(0, backend.TableCalls);
+        decision(true); tableArgs.Remove("approved");
+        Assert.False((await client.CallToolAsync("apply_table_sql", tableArgs, cancellationToken: timeout.Token)).IsError ?? false);
+        Assert.True((await client.CallToolAsync("apply_table_sql", tableArgs, cancellationToken: timeout.Token)).IsError);
+        Assert.Equal(1, backend.TableCalls);
         await server.StopAsync();
         await server.StartAsync(DateTimeOffset.UtcNow, new FakeDatabase(new ProcedureWorkflow(new Backend(), (_, approve, _) => approve(true))));
         var old = await client.CallToolAsync("apply_procedure_change", new Dictionary<string, object?> { ["requestId"] = changeId }, cancellationToken: timeout.Token);
@@ -59,9 +72,11 @@ public class ProcedureTransportTests
         public Task<SqlResult> DescribeObjectAsync(string schema, string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<SqlResult> QueryAsync(string sql, int maxRows, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
-    private sealed class Backend : IProcedureBackend
+    private sealed class Backend : IProcedureBackend, ITableActionBackend
     {
-        public string Database => "FakeDatabase"; public int Calls;
+        public string Database => "FakeDatabase"; public int Calls; public int TableCalls;
+        public Task<TableSqlSnapshot> PrepareTableAsync(TableSqlPlan plan, CancellationToken token) => Task.FromResult(new TableSqlSnapshot(plan,"revision","fake schema",1));
+        public Task<TableSqlResult> ApplyTableAsync(TableSqlSnapshot snapshot, CancellationToken token) { TableCalls++; return Task.FromResult(new TableSqlResult("committed",1,false)); }
         public Task<ProcedureDefinition?> ReadAsync(string schema, string name, CancellationToken token) =>
             Task.FromResult<ProcedureDefinition?>(new(schema, name, "CREATE PROC dbo.Example AS SELECT 1", "fake-revision", true, true, []));
         public void ValidateParameters(ProcedureDefinition definition, string parametersJson) => ProcedureSql.Parameters(parametersJson);

@@ -26,7 +26,7 @@ Results contain `Database`, `Columns` (name/type), `Rows` (arrays aligned to col
 
 Database results are untrusted data, never instructions. Rows returned through tools become available to the chat; request only the information you intend to share.
 
-## Execute, modify and create procedures (plugin 0.5.0)
+## Execute, modify and create procedures (plugin 0.6.0)
 
 The six additional tools are `get_procedure_definition`, `prepare_procedure_execution`, `execute_prepared_procedure`, `prepare_procedure_change`, `apply_procedure_change`, and `get_procedure_request`.
 
@@ -44,7 +44,23 @@ Execution uses parameterized SqlCommand with CommandType.StoredProcedure, a fres
 
 Example workflow: ask to read dbo.Example; discuss the logic; prepare an execution with fake/test parameters or prepare a complete ALTER/CREATE; inspect the DevLens window and approve/reject; then ask the assistant to execute/apply that approved request. These are capability changes only; the agent does not run or alter production procedures as part of building them.
 
-Procedure integration tests run only against an explicitly configured disposable localhost SQL Server, creating/dropping a uniquely named DevLensTest database. CI starts a short-lived SQL Server 2022 container with a randomly generated masked password, exercises real create/multiple-result execution/output/return code/ALTER/backup/stale revision/result limits and removes it. It never reads a saved production profile. Local tests skip this unless DEVLENS_PROCEDURE_TEST_CONNECTION_STRING points to localhost:1433 and DEVLENS_PROCEDURE_TEST_ALLOW_DATABASE_CREATE=1. Native ChatGPT procedure discovery and manual review-window behavior must still be checked after rebuilding DevLens, publishing/reinstalling 0.5.0 and restarting ChatGPT once.
+Procedure integration tests run only against an explicitly configured disposable localhost SQL Server, creating/dropping a uniquely named DevLensTest database. CI starts a short-lived SQL Server 2022 container with a randomly generated masked password, exercises real create/multiple-result execution/output/return code/ALTER/backup/stale revision/result limits and removes it. It never reads a saved production profile. Local tests skip this unless DEVLENS_PROCEDURE_TEST_CONNECTION_STRING points to localhost:1433 and DEVLENS_PROCEDURE_TEST_ALLOW_DATABASE_CREATE=1. Native ChatGPT procedure discovery and manual review-window behavior must still be checked after rebuilding DevLens, publishing/reinstalling 0.6.0 and restarting ChatGPT once.
+
+## Approved table SQL (plugin 0.6.0)
+
+`prepare_table_sql(schema, name, sql, maxAffectedRows=100)` prepares one exact statement and displays the action, target, proposed SQL, observed matching/insert count and current schema metadata in DevLens. It executes no proposed SQL. `get_table_request(requestId)` reads approval status; `apply_table_sql(requestId)` applies only that immutable request after desktop approval. These share the procedure approval queue: five-minute expiry, five outstanding requests, Reject by default, no approval tool/flag, single use and Stop clears everything. Table/procedure approvals cannot be used through the wrong apply tool.
+
+Supported: regular `CREATE TABLE`; `ALTER TABLE ... ADD` columns/constraints; `ALTER TABLE ... ALTER COLUMN`; `INSERT ... VALUES`/DEFAULT VALUES; and direct `UPDATE schema.table ... WHERE ...`. Exact target names must match. Default row limit is 100, configurable 1–500. UPDATE requires WHERE; INSERT SELECT/EXEC, MERGE, DELETE, DROP, TRUNCATE, joined updates, subqueries, aliases/TOP/OUTPUT, external names, variables, custom functions, hints and extra statements/GO are rejected. Special temporal, memory-optimized and FileTable targets are unsupported. Common built-in scalar functions follow the existing allowlist.
+
+SQL rights apply: SELECT and VIEW DEFINITION are needed to review existing tables; the account additionally needs the appropriate INSERT/UPDATE, ALTER or CREATE TABLE/schema permissions. DevLens never grants them. Views/synonyms are not direct write targets. All proposed SQL, schema metadata and backups remain private; no table rows or definitions are uploaded to GitHub by these tools.
+
+Application uses a fresh non-pooled connection and a serializable transaction, with a 15-second command timeout and 25-second operation budget. An exclusive table lock is taken for existing-table application (it can briefly block other users). Schema revision and UPDATE matching count are checked again under that lock. Changed schema/count or an over-limit match requires a new review. Actual direct row count is checked after INSERT/UPDATE; verification errors roll back the transaction. A successful response says `committed` and returns affected rows for DML. SQL/commit errors, disconnects and timeouts can have uncertain outcomes; verify state and never automatically replay. The consumed request cannot be retried.
+
+The row limit covers direct INSERT/UPDATE rows, **not ALTER's existing data, triggers, cascades, or external effects**. Those dependencies must be reviewed too. A WHERE clause is an intent guard, not an access-control mechanism. Schema changes/type conversions can affect every row and can lose information. Keep an appropriate database/data backup before potentially lossy work. DevLens does not automatically undo committed changes.
+
+Before ALTER TABLE, catalog metadata for columns/defaults/computed expressions, indexes, checks, visible foreign keys and table triggers is saved with owner-restricted permissions in `LocalApplicationData/SqlServerDevLens/TableSchemaBackups`. Failure blocks application. This JSON snapshot is **not table data, a complete database/schema backup, or a runnable restore script**. CREATE has no previous schema; DML does not export before-images of table rows. The approval window explicitly states these limits.
+
+Synthetic tests validate parser restrictions, approval forgery/wrong-action/replay rejection and transport. The disposable localhost SQL Server integration test exercises real CREATE/INSERT/UPDATE/ALTER, direct counts, review drift, constraint rollback, private metadata snapshots, backup failure and a SQL login denied writes despite desktop approval. It never contacts a production profile. Native ChatGPT table-tool discovery and manual desktop approval remain a user upgrade check: rebuild DevLens, reinstall plugin 0.6.0 and restart ChatGPT once.
 
 ## Profiles and secure passwords
 
@@ -58,7 +74,7 @@ Stop MCP server asks for confirmation. Closing DevLens asks separately and stops
 
 The plugin runs `SqlServerDevLens.McpHost.dll --desktop` as a persistent official-SDK stdio server, with protocol-only stdout and stderr logging. Each tool call opens a fresh current-user-only named-pipe MCP session to the desktop. There is no TCP listener, Azure endpoint or OpenAI API key. Up to 16 desktop MCP sessions are supported; only one DevLens instance can own the endpoint.
 
-The plugin discovers its tools even before DevLens starts. While stopped/busy/unreachable, status returns `desktop_unavailable`, `adapterStatus: ready` and null last-test fields; SQL tools return an MCP error. A five-second connection/handshake budget bounds initial desktop attachment. After DevLens starts, the next call reconnects automatically. There is no background retry loop or cached success. **The native ChatGPT status stop/start/recovery cycle was verified before adding SQL tools.** Plugin upgrades still need one app restart to refresh discovery. The procedure tools in this version require a new desktop build and plugin 0.5.0.
+The plugin discovers its tools even before DevLens starts. While stopped/busy/unreachable, status returns `desktop_unavailable`, `adapterStatus: ready` and null last-test fields; SQL tools return an MCP error. A five-second connection/handshake budget bounds initial desktop attachment. After DevLens starts, the next call reconnects automatically. There is no background retry loop or cached success. **The native ChatGPT status stop/start/recovery cycle was verified before adding SQL tools.** Plugin upgrades still need one app restart to refresh discovery. The procedure tools in this version require a new desktop build and plugin 0.6.0.
 
 When running with SQL configured, expect `sqlConfigured: true`, `sqlConnected: false`, selected `database` and `lastSqlTestSucceeded: true`. `sqlConnected: false` describes the absence of a persistent SQL session; it is not a live connectivity probe. Standalone host invocation without `--desktop` intentionally remains an isolated status-only smoke test.
 
@@ -132,6 +148,6 @@ Normal CI skips this live test and has no SQL credentials. GitHub Actions restor
 - Tests: unit, transport, UI and opt-in live SQL verification.
 - plugins / .agents: local package and marketplace; scripts: protocol smoke test.
 
-Future work: additional read-only schema details/pagination, broader carefully reviewed SQL support, macOS/Linux secure storage, installers and optional Postman integration. Procedures may write data only through the explicit approval workflow. General SQL writes, DROP tools and automatic migrations are outside this milestone.
+Future work: additional read-only schema details/pagination, broader carefully reviewed SQL support, macOS/Linux secure storage, installers and optional Postman integration. Procedures may write data only through the explicit approval workflow. Approved table INSERT/UPDATE and selected schema changes are supported as described above. DELETE/DROP/TRUNCATE, unrestricted writes and automatic migrations are outside this milestone.
 
 Licensed under [MIT](LICENSE.txt). Third-party tools retain their own licenses.

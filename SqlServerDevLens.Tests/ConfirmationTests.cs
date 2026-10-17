@@ -19,20 +19,27 @@ public class HeadlessAppBuilder
 public class ConfirmationTests
 {
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public Task ProcedureReviewRequiresHumanDecisionAndShowsExactSql(bool approve) => RunOnUi(async () =>
+    [InlineData(false, "procedure")]
+    [InlineData(true, "procedure")]
+    [InlineData(false, "table")]
+    [InlineData(true, "table")]
+    public Task ProcedureReviewRequiresHumanDecisionAndShowsExactSql(bool approve, string targetKind) => RunOnUi(async () =>
     {
         var owner = new Window(); owner.Show();
         var review = new ProcedureReview("fake-request", "FakeDatabase", "dbo", "Example", "alter",
             "CREATE PROC dbo.Example AS SELECT 1", "ALTER PROC dbo.Example AS SELECT 2",
-            "-SELECT 1\n+SELECT 2", "", DateTimeOffset.UtcNow.AddMinutes(5));
+            "-SELECT 1\n+SELECT 2", "", DateTimeOffset.UtcNow.AddMinutes(5), targetKind);
         var dialog = new ProcedureReviewWindow(review);
         var decision = dialog.ShowDialog<bool>(owner);
         Assert.True(dialog.FindControl<Button>("RejectAction")!.IsDefault);
         Assert.Equal(review.Diff, dialog.FindControl<TextBox>("ReviewText")!.Text);
         Assert.Equal(review.Before, dialog.FindControl<TextBox>("BeforeText")!.Text);
         Assert.Equal(review.Proposed, dialog.FindControl<TextBox>("AfterText")!.Text);
+        if (targetKind == "table")
+        {
+            Assert.Equal("Current schema metadata", dialog.FindControl<TabItem>("BeforeTab")!.Header);
+            Assert.Contains("NOT table rows", dialog.FindControl<TextBlock>("Scope")!.Text);
+        }
         dialog.FindControl<Button>(approve ? "ApproveAction" : "RejectAction")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Assert.Equal(approve, await decision); owner.Close();
     });

@@ -4,6 +4,7 @@ namespace SqlServerDevLens.Core;
 
 public static class ReadOnlySql
 {
+    internal static void ValidateReferences(TSqlFragment fragment) => fragment.Accept(new Guard());
     public static void Validate(string sql)
     {
         if (string.IsNullOrWhiteSpace(sql) || sql.Length > 20000)

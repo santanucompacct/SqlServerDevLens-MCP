@@ -7,15 +7,15 @@
         <TextBlock x:Name="Heading" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
         <TextBlock x:Name="Scope" Grid.Row="1" TextWrapping="Wrap" Foreground="#CBD5E1" />
         <TabControl Grid.Row="2">
-            <TabItem Header="Exact diff / Parameters">
+            <TabItem x:Name="ReviewTab" Header="Exact diff / Parameters">
                 <TextBox x:Name="ReviewText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" FontFamily="Consolas,monospace"
                          ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" />
             </TabItem>
-            <TabItem Header="Current definition">
+            <TabItem x:Name="BeforeTab" Header="Current definition">
                 <TextBox x:Name="BeforeText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" FontFamily="Consolas,monospace"
                          ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" />
             </TabItem>
-            <TabItem Header="Proposed definition">
+            <TabItem x:Name="AfterTab" Header="Proposed definition">
                 <TextBox x:Name="AfterText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" FontFamily="Consolas,monospace"
                          ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" />
             </TabItem>

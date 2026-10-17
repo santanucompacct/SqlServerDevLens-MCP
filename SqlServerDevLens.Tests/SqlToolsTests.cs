@@ -70,7 +70,7 @@ public class SqlToolsTests
         await using var client = await McpClient.CreateAsync(new StdioClientTransport(new()
         { Command = "dotnet", Arguments = [dll, "--desktop", "--pipe-name", name] }), cancellationToken: timeout.Token);
         var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-        Assert.Equal(11, tools.Count);
+        Assert.Equal(14, tools.Count);
         var status = await client.CallToolAsync("get_server_status", cancellationToken: timeout.Token);
         Assert.Contains("\"sqlConfigured\":true", Assert.IsType<TextContentBlock>(status.Content[0]).Text);
         foreach (var tool in new[] { "get_database_info", "list_database_objects", "describe_table", "query_read_only" })
