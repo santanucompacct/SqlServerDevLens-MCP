@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
+using SqlServerDevLens.Core;
 
 namespace SqlServerDevLens.Desktop.ViewModels;
 
@@ -20,19 +21,43 @@ public class MainViewModel : ViewModelBase
     private bool _isChoosingMode = true;
     private bool _isServerStepVisible;
     private bool _shuttingDown;
+    private bool _isPostmanStepVisible;
+    private ConnectionProfile? _pendingProfile;
+    private string? _pendingPassword;
 
     public MainViewModel() : this(new ConnectionViewModel(), new ServerViewModel()) { }
-    public MainViewModel(ConnectionViewModel connection, ServerViewModel server)
+    public MainViewModel(ConnectionViewModel connection, ServerViewModel server, PostmanViewModel? postman = null)
     {
-        Connection = connection; Server = server;
+        Connection = connection; Server = server; Postman = postman ?? new PostmanViewModel();
         Connection.ConnectionSucceeded += async (profile, password) =>
         {
             if (_shuttingDown) return;
+            if (_selectedMode == DevLensMode.SqlWithPostman)
+            {
+                _pendingProfile = profile; _pendingPassword = password;
+                IsPostmanStepVisible = true;
+                await Postman.LoadSavedKeyAsync();
+                return;
+            }
             IsServerStepVisible = true;
             await Server.StartAsync(profile, Connection.Status, password);
         };
+        Postman.Ready += async selection =>
+        {
+            if (_shuttingDown || _pendingProfile is null) return;
+            var profile = _pendingProfile; var password = _pendingPassword;
+            _pendingProfile = null; _pendingPassword = null;
+            IsPostmanStepVisible = false; IsServerStepVisible = true;
+            await Server.StartAsync(profile, Connection.Status, password, selection);
+        };
         ContinueCommand = new AsyncRelayCommand(async () => { await Connection.LoadAsync(); IsChoosingMode = false; });
         BackCommand = new RelayCommand(() => { Connection.Password = ""; IsChoosingMode = true; });
+        BackFromPostmanCommand = new AsyncRelayCommand(async () =>
+        {
+            if (Postman.IsBusy) return;
+            _pendingProfile = null; _pendingPassword = null; Postman.ClearSession();
+            IsPostmanStepVisible = false; await Connection.LoadAsync();
+        });
         ReturnToConnectionCommand = new AsyncRelayCommand(async () =>
         {
             if (!Server.CanReturn) return;
@@ -42,12 +67,21 @@ public class MainViewModel : ViewModelBase
     }
 
     public ConnectionViewModel Connection { get; }
+    public PostmanViewModel Postman { get; }
+    public IAsyncRelayCommand BackFromPostmanCommand { get; }
     public ServerViewModel Server { get; }
     public IAsyncRelayCommand ReturnToConnectionCommand { get; }
     public async System.Threading.Tasks.Task ShutdownAsync()
     {
+        if (_shuttingDown) return;
         _shuttingDown = true;
+        _pendingProfile = null; _pendingPassword = null; Postman.Dispose();
         await Server.StopAsync();
+    }
+    public bool IsPostmanStepVisible
+    {
+        get => _isPostmanStepVisible;
+        private set { if (SetProperty(ref _isPostmanStepVisible, value)) OnPropertyChanged(nameof(IsConnectionStepVisible)); }
     }
     public bool IsServerStepVisible
     {
@@ -96,7 +130,7 @@ public class MainViewModel : ViewModelBase
         }
     }
 
-    public bool IsConnectionStepVisible => !IsChoosingMode && !IsServerStepVisible;
+    public bool IsConnectionStepVisible => !IsChoosingMode && !IsServerStepVisible && !IsPostmanStepVisible;
 
     private void SelectMode(DevLensMode mode)
     {

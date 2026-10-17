@@ -1,5 +1,14 @@
 # Release notes
 
+## 0.7.0 — Postman setup milestone (2026-10-17)
+
+- SQL Server + Postman now follows SQL test → masked API-key entry → Load Workspaces → workspace selection → Load Collections → collection selection → Start MCP Server.
+- Optional API-key saving uses Windows Credential Manager, separately from SQL passwords; Forget removes it. No key or collection variable values are written to JSON.
+- Two MCP tools expose selected workspace/collection and bounded request/variable-name summaries. These are startup snapshots; request execution, scripts, tests and resource editing are not enabled.
+- SQL Server Only retains direct startup. SQL query, stored-procedure and table-action implementations are unchanged.
+- Postman HTTP integration is checked with synthetic local CLI simulations; real account access still requires the user to enter their key and validate in the rebuilt app. Existing SQL regression and isolated SQL Server tests remain part of CI.
+- Updating requires rebuilding DevLens, publishing/reinstalling plugin 0.7.0 and restarting the chat app once for tool discovery. This milestone is developed on `feature/postman-setup`; use that branch until its PR is merged.
+
 ## 0.6.1 — 2026-10-17
 
 Completed SQL milestone for one selected database. The local plugin package version is 0.6.1.

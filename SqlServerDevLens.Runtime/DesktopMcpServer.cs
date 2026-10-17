@@ -10,7 +10,7 @@ public interface IDesktopMcpServer : IAsyncDisposable
 {
     bool IsRunning { get; }
     event Action? StoppedUnexpectedly;
-    Task StartAsync(DateTimeOffset sqlTestedAt, ISqlDatabase? database = null);
+    Task StartAsync(DateTimeOffset sqlTestedAt, ISqlDatabase? database = null, PostmanSelection? postman = null);
     Task StopAsync();
 }
 
@@ -41,13 +41,13 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
         PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly |
         (firstInstance ? PipeOptions.FirstPipeInstance : PipeOptions.None));
 
-    public async Task StartAsync(DateTimeOffset sqlTestedAt, ISqlDatabase? database = null)
+    public async Task StartAsync(DateTimeOffset sqlTestedAt, ISqlDatabase? database = null, PostmanSelection? postman = null)
     {
         await _lifecycle.WaitAsync();
         try
         {
             if (_shutdown is not null) throw new InvalidOperationException("Server is already started.");
-            var tools = CreateTools(database, sqlTestedAt);
+            var tools = CreateTools(database, sqlTestedAt, postman);
             // Reserve the endpoint exclusively, allowing multiple instances owned by this server.
             _listener = CreateListener(firstInstance: true);
             _database = database;
@@ -126,16 +126,18 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
         }
     }
 
-    private static McpServerTool[] CreateTools(ISqlDatabase? database, DateTimeOffset testedAt) =>
+    private static McpServerTool[] CreateTools(ISqlDatabase? database, DateTimeOffset testedAt, PostmanSelection? postman) =>
     [
         McpServerTool.Create(() => new
         {
             service = "SQL Server DevLens MCP", status = "running", transport = "desktop-pipe",
             sqlConfigured = database is not null, sqlConnected = false, database = database?.Database,
-            lastSqlTestSucceeded = true, lastSqlTestUtc = testedAt, postmanImplemented = false,
-            message = "SQL connections open per operation and are disposed. Procedure actions require explicit desktop approval. Postman is not implemented."
+            lastSqlTestSucceeded = true, lastSqlTestUtc = testedAt, postmanImplemented = true,
+            postmanConfigured = postman is not null, postmanRequestExecutionEnabled = false,
+            message = "SQL connections open per operation and are disposed. SQL actions require desktop approval. Postman supports selected-collection metadata only; API execution is not enabled."
         }, new() { Name = "get_server_status", Description = "Returns desktop server state and last SQL test; does not query SQL." }),
-        ..new DatabaseTools(database).CreateTools(), ..new ProcedureTools(database?.Procedures).CreateTools()
+        ..new DatabaseTools(database).CreateTools(), ..new ProcedureTools(database?.Procedures).CreateTools(),
+        ..new PostmanTools(postman).CreateTools()
     ];
 
     public async Task StopAsync()

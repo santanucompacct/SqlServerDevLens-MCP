@@ -40,7 +40,7 @@ public sealed class DesktopStatusClient(string? pipeName = null, TimeSpan? reque
                     service = "SQL Server DevLens MCP", status = "desktop_unavailable", adapterStatus = "ready",
                     transport = "stdio", sqlConfigured = false, sqlConnected = false,
                     lastSqlTestSucceeded = (bool?)null, lastSqlTestUtc = (DateTimeOffset?)null,
-                    postmanImplemented = false,
+                    postmanImplemented = true, postmanConfigured = (bool?)null, postmanRequestExecutionEnabled = false,
                     outcomeUnknown = name is "execute_prepared_procedure" or "apply_procedure_change" or "apply_table_sql",
                     message = name is "execute_prepared_procedure" or "apply_procedure_change" or "apply_table_sql"
                         ? "Connection lost or operation timed out. The approved action may already have committed. Verify database state; do not retry automatically. The request may have been consumed."

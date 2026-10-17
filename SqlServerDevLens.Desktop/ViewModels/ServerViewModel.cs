@@ -17,6 +17,7 @@ public partial class ServerViewModel : ViewModelBase
     [ObservableProperty] private string _status = "Stopped";
     [ObservableProperty] private string _connectionSummary = "";
     [ObservableProperty] private string _connectionNotice = "";
+    [ObservableProperty] private string _postmanSummary = "Postman disabled — SQL Server Only.";
     public bool CanStop => IsRunning && !IsBusy;
     public bool CanReturn => !IsRunning && !IsBusy;
     public Action<ProcedureReview, Action<bool>, System.Threading.CancellationToken>? RequestProcedureReview { get; set; }
@@ -29,11 +30,13 @@ public partial class ServerViewModel : ViewModelBase
     }
     partial void OnIsRunningChanged(bool value) { OnPropertyChanged(nameof(CanStop)); OnPropertyChanged(nameof(CanReturn)); }
     partial void OnIsBusyChanged(bool value) { OnPropertyChanged(nameof(CanStop)); OnPropertyChanged(nameof(CanReturn)); }
-    public async Task StartAsync(ConnectionProfile profile, string notice, string? password = null)
+    public async Task StartAsync(ConnectionProfile profile, string notice, string? password = null, PostmanSelection? postman = null)
     {
         IsBusy = true; Status = "Starting MCP server…";
         ConnectionSummary = $"{profile.Host}:{profile.Port} / {profile.Database}";
         ConnectionNotice = notice;
+        PostmanSummary = postman is null ? "Postman disabled — SQL Server Only."
+            : $"Postman: {postman.Workspace.Name} / {postman.Collection.Name} — {postman.Requests.Length} requests. Metadata only; API execution is not enabled.";
         try
         {
             var database = new SqlDatabase(profile, password, (request, decision, token) =>
@@ -41,7 +44,7 @@ public partial class ServerViewModel : ViewModelBase
                 if (RequestProcedureReview is null) { decision(false); return; }
                 RequestProcedureReview(request, decision, token);
             });
-            try { await _server.StartAsync(DateTimeOffset.UtcNow, database); }
+            try { await _server.StartAsync(DateTimeOffset.UtcNow, database, postman); }
             catch { database.Dispose(); throw; }
             IsRunning = _server.IsRunning;
             Status = IsRunning ? "Running — local MCP server is available" : "Server could not start. Test the connection again.";

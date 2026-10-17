@@ -376,6 +376,9 @@ FodyWeavers.xsd
 # Postman local configuration
 **/postman.local.json
 **/postman.environment.local.json
+**/sim.ndjson
+**/sim.err
+postman/.dependencies/
 
 # Platform-specific generated files
 .DS_Store

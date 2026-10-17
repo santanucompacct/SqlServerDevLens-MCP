@@ -2,13 +2,13 @@
 
 **Your SQL Server, understood by AI.** MIT-licensed .NET 10 / Avalonia desktop application with owl branding.
 
-## Version 0.6.1: SQL exploration and approved procedure/table actions
+## Version 0.7.0: SQL tools plus optional Postman setup
 
-Completed: inspect table structure/data and procedure definitions; execute procedures with parameters and multiple result sets; create/modify procedures; create tables, add/alter columns, insert rows and update rows. Every procedure execution/change and table write requires explicit approval in DevLens. See [release notes](CHANGELOG.md) for verified coverage and limits. Postman integration is the next planned milestone and is not implemented.
+Completed: inspect table structure/data and procedure definitions; execute procedures with parameters and multiple result sets; create/modify procedures; create tables, add/alter columns, insert rows and update rows. Every procedure execution/change and table write requires explicit approval in DevLens. See [release notes](CHANGELOG.md) for verified coverage and limits. Optional Postman setup and selected-collection metadata are now available. Postman request execution and editing remain planned.
 
-Choose SQL Server Only or SQL Server + Postman, then enter a TCP host, port (default 1433), one required database, SQL or Windows authentication, and TLS settings. Encryption defaults on; trust-server-certificate defaults off. Named instances must be resolved to a TCP port. Windows authentication uses the process identity; macOS/Linux require configured Kerberos. **Postman is planned and inactive in both modes.**
+Choose SQL Server Only or SQL Server + Postman, then enter a TCP host, port (default 1433), one required database, SQL or Windows authentication, and TLS settings. Encryption defaults on; trust-server-certificate defaults off. Named instances must be resolved to a TCP port. Windows authentication uses the process identity; macOS/Linux require configured Kerberos. **SQL Server Only starts MCP after SQL succeeds. SQL Server + Postman continues to key, workspace and collection setup before starting MCP.**
 
-Test Connection opens/disposes a SqlClient connection. On success the desktop starts its local MCP server and shows the control window. The tested connection details and password are retained **only in desktop process memory while the server runs**, including when Remember password is unchecked. No credentials are passed to the plugin process, command line or MCP client. Every SQL operation opens/disposes its own connection; pooling is disabled for tool connections. Stop cancels desktop sessions/SQL operations and releases the active context. Managed strings cannot be guaranteed zeroed by .NET.
+Test Connection opens/disposes a SqlClient connection. On success SQL Server Only starts the local MCP server; combined mode first opens Postman setup. The tested connection details and password are retained **only in desktop process memory while the server runs**, including when Remember password is unchecked. No credentials are passed to the plugin process, command line or MCP client. Every SQL operation opens/disposes its own connection; pooling is disabled for tool connections. Stop cancels desktop sessions/SQL operations and releases the active context. Managed strings cannot be guaranteed zeroed by .NET.
 
 The desktop and plugin expose:
 
@@ -46,7 +46,7 @@ Execution uses parameterized SqlCommand with CommandType.StoredProcedure, a fres
 
 Example workflow: ask to read dbo.Example; discuss the logic; prepare an execution with fake/test parameters or prepare a complete ALTER/CREATE; inspect the DevLens window and approve/reject; then ask the assistant to execute/apply that approved request. These are capability changes only; the agent does not run or alter production procedures as part of building them.
 
-Procedure integration tests run only against an explicitly configured disposable localhost SQL Server, creating/dropping a uniquely named DevLensTest database. CI starts a short-lived SQL Server 2022 container with a randomly generated masked password, exercises real create/multiple-result execution/output/return code/ALTER/backup/stale revision/result limits and removes it. It never reads a saved production profile. Local tests skip this unless DEVLENS_PROCEDURE_TEST_CONNECTION_STRING points to localhost:1433 and DEVLENS_PROCEDURE_TEST_ALLOW_DATABASE_CREATE=1. Native ChatGPT procedure discovery and manual review-window behavior must still be checked after rebuilding DevLens, publishing/reinstalling 0.6.1 and restarting ChatGPT once.
+Procedure integration tests run only against an explicitly configured disposable localhost SQL Server, creating/dropping a uniquely named DevLensTest database. CI starts a short-lived SQL Server 2022 container with a randomly generated masked password, exercises real create/multiple-result execution/output/return code/ALTER/backup/stale revision/result limits and removes it. It never reads a saved production profile. Local tests skip this unless DEVLENS_PROCEDURE_TEST_CONNECTION_STRING points to localhost:1433 and DEVLENS_PROCEDURE_TEST_ALLOW_DATABASE_CREATE=1. Native ChatGPT procedure discovery and manual review-window behavior must still be checked after rebuilding DevLens, publishing/reinstalling 0.7.0 and restarting ChatGPT once.
 
 ## Approved table SQL (plugin 0.6.1)
 
@@ -62,7 +62,23 @@ The row limit covers direct INSERT/UPDATE rows, **not ALTER's existing data, tri
 
 Before ALTER TABLE, catalog metadata for columns/defaults/computed expressions, indexes, checks, visible foreign keys and table triggers is saved with owner-restricted permissions in `LocalApplicationData/SqlServerDevLens/TableSchemaBackups`. Failure blocks application. This JSON snapshot is **not table data, a complete database/schema backup, or a runnable restore script**. CREATE has no previous schema; DML does not export before-images of table rows. The approval window explicitly states these limits.
 
-Synthetic tests validate parser restrictions, approval forgery/wrong-action/replay rejection and transport. The disposable localhost SQL Server integration test exercises real CREATE/INSERT/UPDATE/ALTER, direct counts, review drift, constraint rollback, private metadata snapshots, backup failure and a SQL login denied writes despite desktop approval. It never contacts a production profile. Native ChatGPT table-tool discovery and manual desktop approval remain a user upgrade check: rebuild DevLens, reinstall plugin 0.6.1 and restart ChatGPT once.
+Synthetic tests validate parser restrictions, approval forgery/wrong-action/replay rejection and transport. The disposable localhost SQL Server integration test exercises real CREATE/INSERT/UPDATE/ALTER, direct counts, review drift, constraint rollback, private metadata snapshots, backup failure and a SQL login denied writes despite desktop approval. It never contacts a production profile. Native ChatGPT table-tool discovery and manual desktop approval remain a user upgrade check: rebuild DevLens, reinstall plugin 0.7.0 and restart ChatGPT once.
+
+## Postman setup (plugin 0.7.0)
+
+Choose SQL Server + Postman, test SQL successfully, then enter a Postman API key in the masked field. Click **Load Workspaces**, select a workspace by name/ID, click **Load Collections**, select a collection, then **Start MCP Server**. Starting rechecks collection membership and reads its metadata. A failed Postman validation keeps you on setup; Back discards the pending SQL context and requires another SQL test. SQL Server Only keeps its existing direct startup flow. SQL query/execution/approval implementations are unchanged.
+
+Remember API key saves only after successful collection validation, using Windows Credential Manager under the separate `SqlServerDevLens/PostmanApiKey` entry. Forget saved key removes it. Unchecking Remember removes a previously saved key when setup completes successfully. macOS/Linux saving is disabled pending a secure adapter. Workspace/collection selections are chosen afresh on each setup; no Postman profile JSON is written. Failed access never falls back to plaintext storage. Keys are not sent to the stdio adapter, logs or chat tools. Setup keeps the tested SQL context in memory until startup, Back or Close.
+
+The client makes metadata GETs to the official `https://api.postman.com` endpoint with `X-API-Key`, verified against [Postman authentication](https://learning.postman.com/docs/reference/postman-api/authentication) and [collection API documentation](https://learning.postman.com/api-docs/api-reference/collections/get-collection). Redirects are rejected so the key cannot follow another origin. Requests have time/size limits, safe HTTP errors and no automatic retry. The list limit is 1000 entries, response limit 4 MB, nesting limit 20 and retained summary limit 128,000 characters. Oversize/unsupported responses require a smaller collection. Account permissions, region/plan restrictions and API quotas still apply.
+
+The two additional MCP tools are `get_postman_selection` (workspace/collection, check time, request count, variable names) and `list_postman_requests` (request names/folder paths and methods). These return the **startup metadata snapshot**, not a live Postman refresh. Stop clears it; return to setup to reload. In SQL-only mode these tools report Postman unconfigured. The server status distinguishes `postmanImplemented`, `postmanConfigured` and `postmanRequestExecutionEnabled: false`.
+
+Collection JSON is read transiently to extract summaries and then discarded. Variable values, auth, request URLs/headers/bodies, examples and scripts are excluded from retained metadata and MCP output. Collection/request/variable names still become visible in chat; treat them as untrusted data. No collection API request, script or test executes. No Postman resources are created/edited. API execution with explicit approval, variable resolution, Vault/environment support and request editing are separate future work.
+
+Verification uses synthetic fixtures only. A local Postman CLI 1.73.0 simulation serves the documented workspace/collection response shapes; the actual HTTP client is tested against it, including 401/403/429/503, redirect rejection, invalid JSON, cancellation and secret-value omission. The owning team's private mock search was skipped because this CLI is signed out; the fixture is based on the public contract, not a copy of a user collection. Real account access and manual dropdown/secure-save behavior remain to be verified in the rebuilt application.
+
+To rerun locally, start `postman simulation run postman/simulations/setup.sim.yaml --port 4917 --output ndjson --no-history` in one terminal. In another set `$env:DEVLENS_POSTMAN_SIMULATION_URL='http://127.0.0.1:4917/postman/'` and run `dotnet test SqlServerDevLens.slnx -c Release --filter FullyQualifiedName~RealHttpClientAgainstPostmanSimulation`. Stop the simulation afterward. Production setup has no editable endpoint; the alternate origin constructor accepts only loopback HTTP for tests. No Postman CLI/login is required by the desktop application.
 
 ## Profiles and secure passwords
 
@@ -76,11 +92,13 @@ Stop MCP server asks for confirmation. Closing DevLens asks separately and stops
 
 The plugin runs `SqlServerDevLens.McpHost.dll --desktop` as a persistent official-SDK stdio server, with protocol-only stdout and stderr logging. Each tool call opens a fresh current-user-only named-pipe MCP session to the desktop. There is no TCP listener, Azure endpoint or OpenAI API key. Up to 16 desktop MCP sessions are supported; only one DevLens instance can own the endpoint.
 
-The plugin discovers its tools even before DevLens starts. While stopped/busy/unreachable, status returns `desktop_unavailable`, `adapterStatus: ready` and null last-test fields; SQL tools return an MCP error. A five-second connection/handshake budget bounds initial desktop attachment. After DevLens starts, the next call reconnects automatically. There is no background retry loop or cached success. **The native ChatGPT status stop/start/recovery cycle was verified before adding SQL tools.** Plugin upgrades still need one app restart to refresh discovery. The procedure tools in this version require a new desktop build and plugin 0.6.1.
+The plugin discovers its tools even before DevLens starts. While stopped/busy/unreachable, status returns `desktop_unavailable`, `adapterStatus: ready` and null last-test fields; SQL tools return an MCP error. A five-second connection/handshake budget bounds initial desktop attachment. After DevLens starts, the next call reconnects automatically. There is no background retry loop or cached success. **The native ChatGPT status stop/start/recovery cycle was verified before adding SQL tools.** Plugin upgrades still need one app restart to refresh discovery. The procedure tools in this version require a new desktop build and plugin 0.7.0.
 
 When running with SQL configured, expect `sqlConfigured: true`, `sqlConnected: false`, selected `database` and `lastSqlTestSucceeded: true`. `sqlConnected: false` describes the absence of a persistent SQL session; it is not a live connectivity probe. Standalone host invocation without `--desktop` intentionally remains an isolated status-only smoke test.
 
 ## Pull and run in Visual Studio 2026
+
+Postman 0.7.0 is currently on `feature/postman-setup` until its PR is merged. For this preview, substitute that branch for `master` in the commands below. The merged SQL milestone remains available at `v0.6.1`.
 
 Install Visual Studio 2026 with .NET desktop development and .NET 10 SDK. In your existing clone:
 
@@ -150,6 +168,6 @@ Normal CI skips this live test and has no SQL credentials. GitHub Actions restor
 - Tests: unit, transport, UI and opt-in live SQL verification.
 - plugins / .agents: local package and marketplace; scripts: protocol smoke test.
 
-Future work: additional read-only schema details/pagination, broader carefully reviewed SQL support, macOS/Linux secure storage, installers and optional Postman integration. Procedures may write data only through the explicit approval workflow. Approved table INSERT/UPDATE and selected schema changes are supported as described above. DELETE/DROP/TRUNCATE, unrestricted writes and automatic migrations are outside this milestone.
+Future work: additional read-only schema details/pagination, broader carefully reviewed SQL support, macOS/Linux secure storage, installers and approved Postman request execution/editing. Procedures may write data only through the explicit approval workflow. Approved table INSERT/UPDATE and selected schema changes are supported as described above. DELETE/DROP/TRUNCATE, unrestricted writes and automatic migrations are outside this milestone.
 
 Licensed under [MIT](LICENSE.txt). Third-party tools retain their own licenses.
