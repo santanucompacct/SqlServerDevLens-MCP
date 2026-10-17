@@ -12,7 +12,10 @@ $root = (Get-ChildItem -LiteralPath $testRoot -Directory | Select-Object -First 
 $plugin = Join-Path $root 'plugins/sql-server-devlens'
 $manifest = Get-Content -Raw (Join-Path $plugin 'plugin.json') | ConvertFrom-Json
 $mcp = Get-Content -Raw (Join-Path $plugin 'mcp.json') | ConvertFrom-Json
-if ($mcp.mcpServers.'sql-server-devlens'.command -ne '${PLUGIN_ROOT}/server/SqlServerDevLens.McpHost.exe') { throw 'Distribution must launch its self-contained EXE.' }
+$adapterCommand = $mcp.mcpServers.'sql-server-devlens'.command
+if ($adapterCommand -ne './server/SqlServerDevLens.McpHost.exe') { throw 'Distribution must use an Agent Plugins contained ./ executable command; ${PLUGIN_ROOT} is not valid in command.' }
+$adapterPath = Join-Path $plugin $adapterCommand.Substring(2)
+if (-not (Test-Path -LiteralPath $adapterPath -PathType Leaf)) { throw 'Packaged MCP command does not resolve to an executable.' }
 foreach ($relative in @('.agents/plugins/marketplace.json', 'plugins/sql-server-devlens/.codex-plugin/plugin.json', 'plugins/sql-server-devlens/skills/devlens-workflow/SKILL.md', 'desktop/SqlServerDevLens.Desktop.exe', 'Setup-Plugin.ps1', 'licenses/dependencies.json')) {
     if (-not (Test-Path -LiteralPath (Join-Path $root $relative))) { throw "Archive missing $relative" }
 }
@@ -55,7 +58,7 @@ foreach ($mode in @('fresh', 'same', 'conflict')) {
     }
     $process.Dispose()
 }
-& (Join-Path $PSScriptRoot 'Test-Mcp.ps1') -HostExe (Join-Path $plugin 'server/SqlServerDevLens.McpHost.exe')
+& (Join-Path $PSScriptRoot 'Test-Mcp.ps1') -HostExe $adapterPath
 Write-Host 'PASS: extracted archive/checksum, EXE protocol, runtime packaging and Windows PowerShell 5.1 setup (fresh, repeat, conflicting source; paths with spaces). No real marketplace or SQL/Postman changes.'
 } finally {
     $absolute = [IO.Path]::GetFullPath($testRoot)

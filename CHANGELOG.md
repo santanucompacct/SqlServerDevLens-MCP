@@ -1,5 +1,11 @@
 # Release notes
 
+## Unreleased — Windows portable plugin discovery
+
+- Fix the portable MCP command to `./server/SqlServerDevLens.McpHost.exe`. The local Agent Plugins loader rejects `${PLUGIN_ROOT}` in `command`, silently leaving the skill available without MCP tools. Arguments and working directory retain their supported configuration.
+- Check the package command and its resolved executable during extracted-distribution testing. Raw EXE protocol tests alone do not verify plugin discovery.
+- Existing 0.9.0 portable installations can correct this one field in `plugins/sql-server-devlens/mcp.json`, rerun `Install-Plugin.cmd`, then fully restart the chat app. The desktop application needs no rebuild. Native tool availability must still be checked in the restarted chat.
+
 ## 0.9.0 — SQL + Postman milestone and Windows distribution (2026-10-17)
 
 - Consolidates the approved SQL/Postman workflows, connection help, bundled skill and activity panel on the default master branch.

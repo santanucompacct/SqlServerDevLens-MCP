@@ -26,7 +26,9 @@ if ($metadata.version -ne $Version) { throw 'Plugin and distribution versions mu
 $mcpPath = Join-Path $plugin 'mcp.json'
 $mcp = Get-Content -Raw $mcpPath | ConvertFrom-Json
 $server = $mcp.mcpServers.'sql-server-devlens'
-$server.command = '${PLUGIN_ROOT}/server/SqlServerDevLens.McpHost.exe'
+# Agent Plugins resolves a contained ./ command against the installed plugin root.
+# ${PLUGIN_ROOT} is supported in arguments/cwd, but is rejected in command.
+$server.command = './server/SqlServerDevLens.McpHost.exe'
 $server.args = @('--desktop')
 $mcp | ConvertTo-Json -Depth 12 | Set-Content -Encoding utf8 $mcpPath
 $catalog = Join-Path $package '.agents/plugins'
