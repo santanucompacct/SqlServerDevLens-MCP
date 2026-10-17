@@ -1,6 +1,6 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "sql-server-devlens",
-  "version": "0.3.4",
-  "description": "Desktop-controlled SQL Server DevLens MCP status server. Start after a successful SQL test; stop from DevLens. SQL inspection and Postman are planned."
+  "version": "0.4.0",
+  "description": "Single-database read-only SQL inspection and bounded SELECT queries through the DevLens desktop connection. Automatic reconnection; Postman planned."
 }

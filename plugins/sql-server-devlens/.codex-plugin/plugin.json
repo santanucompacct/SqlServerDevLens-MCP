@@ -1,13 +1,13 @@
 {
   "name": "sql-server-devlens",
-  "version": "0.3.4",
-  "description": "Desktop-controlled SQL Server DevLens MCP status server. SQL inspection and Postman are planned.",
+  "version": "0.4.0",
+  "description": "Single-database read-only SQL inspection and bounded SELECT queries through the DevLens desktop connection. Automatic reconnection; Postman planned.",
   "mcpServers": "./mcp.json",
   "interface": {
     "displayName": "SQL Server DevLens",
-    "shortDescription": "Local SQL MCP server status",
+    "shortDescription": "Read-only SQL database exploration",
     "developerName": "Santanu Das",
     "category": "Productivity",
-    "defaultPrompt": "Call get_server_status from SQL Server DevLens."
+    "defaultPrompt": "Check SQL Server DevLens status, then list the selected database objects."
   }
 }

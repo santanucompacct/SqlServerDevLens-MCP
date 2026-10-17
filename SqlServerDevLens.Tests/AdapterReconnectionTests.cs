@@ -29,7 +29,7 @@ public class AdapterReconnectionTests
         await using var chat = await McpClient.CreateAsync(new StdioClientTransport(new()
         { Command = "dotnet", Arguments = [dll, "--desktop", "--pipe-name", name] }), cancellationToken: timeout.Token);
         var tools = await chat.ListToolsAsync(cancellationToken: timeout.Token);
-        Assert.Single(tools); Assert.Equal("get_server_status", tools[0].Name);
+        Assert.Equal(5, tools.Count); Assert.Contains(tools, t => t.Name == "get_server_status");
         var offline = Status(await chat.CallToolAsync("get_server_status", cancellationToken: timeout.Token));
         Assert.Equal("desktop_unavailable", offline.GetProperty("status").GetString());
         Assert.Equal("ready", offline.GetProperty("adapterStatus").GetString());
@@ -46,7 +46,7 @@ public class AdapterReconnectionTests
             offline = Status(await chat.CallToolAsync("get_server_status", cancellationToken: timeout.Token));
             Assert.Equal("desktop_unavailable", offline.GetProperty("status").GetString());
             Assert.Equal(JsonValueKind.Null, offline.GetProperty("lastSqlTestUtc").ValueKind);
-            Assert.Single(await chat.ListToolsAsync(cancellationToken: timeout.Token));
+            Assert.Equal(5, (await chat.ListToolsAsync(cancellationToken: timeout.Token)).Count);
         }
     }
 

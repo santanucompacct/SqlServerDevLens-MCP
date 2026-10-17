@@ -112,7 +112,7 @@ public class ConfirmationTests
         public bool IsRunning { get; private set; }
         public int StopCount;
         public event Action? StoppedUnexpectedly { add { } remove { } }
-        public Task StartAsync(DateTimeOffset sqlTestedAt) { IsRunning = true; return Task.CompletedTask; }
+        public Task StartAsync(DateTimeOffset sqlTestedAt, SqlServerDevLens.Core.ISqlDatabase? database = null) { IsRunning = true; return Task.CompletedTask; }
         public Task StopAsync() { IsRunning = false; StopCount++; return Task.CompletedTask; }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }

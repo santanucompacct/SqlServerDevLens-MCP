@@ -30,7 +30,7 @@ public class ConcurrentServerTests
     private static async Task AssertStatus(McpClient client, CancellationToken cancellationToken)
     {
         var tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
-        Assert.Single(tools); Assert.Equal("get_server_status", tools[0].Name);
+        Assert.Equal(5, tools.Count); Assert.Contains(tools, t => t.Name == "get_server_status");
         var result = await client.CallToolAsync("get_server_status", cancellationToken: cancellationToken);
         Assert.False(result.IsError ?? false);
         using var status = JsonDocument.Parse(Assert.IsType<TextContentBlock>(result.Content[0]).Text);

@@ -2,6 +2,7 @@ using System.IO.Pipes;
 using System.Security.Cryptography;
 using System.Text;
 using ModelContextProtocol.Server;
+using SqlServerDevLens.Core;
 
 namespace SqlServerDevLens.Runtime;
 
@@ -9,11 +10,12 @@ public interface IDesktopMcpServer : IAsyncDisposable
 {
     bool IsRunning { get; }
     event Action? StoppedUnexpectedly;
-    Task StartAsync(DateTimeOffset sqlTestedAt);
+    Task StartAsync(DateTimeOffset sqlTestedAt, ISqlDatabase? database = null);
     Task StopAsync();
 }
 
-// No TCP listener, credential file, SQL password, or persistent SQL connection.
+// No TCP listener or credential file. Only the desktop holds the active SQL
+// context, releasing it on Stop; SQL connections are per operation.
 public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServer
 {
     public const int MaxConcurrentSessions = 16;
@@ -28,6 +30,7 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
     private NamedPipeServerStream? _listener;
     private CancellationTokenSource? _shutdown;
     private Task? _acceptLoop;
+    private ISqlDatabase? _database;
     private volatile bool _isRunning;
     public bool IsRunning => _isRunning;
     public event Action? StoppedUnexpectedly;
@@ -37,7 +40,7 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
         PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly |
         (firstInstance ? PipeOptions.FirstPipeInstance : PipeOptions.None));
 
-    public async Task StartAsync(DateTimeOffset sqlTestedAt)
+    public async Task StartAsync(DateTimeOffset sqlTestedAt, ISqlDatabase? database = null)
     {
         await _lifecycle.WaitAsync();
         try
@@ -45,6 +48,7 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
             if (_shutdown is not null) throw new InvalidOperationException("Server is already started.");
             // Reserve the endpoint exclusively, allowing multiple instances owned by this server.
             _listener = CreateListener(firstInstance: true);
+            _database = database;
             _shutdown = new CancellationTokenSource();
             _isRunning = true;
             _acceptLoop = AcceptAsync(_listener, sqlTestedAt, _shutdown.Token);
@@ -86,6 +90,7 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
         {
             _isRunning = false;
             _shutdown!.Cancel();
+            _database?.Dispose(); _database = null;
             Session[] active;
             lock (_sessionGate) active = _sessions.ToArray();
             foreach (var session in active) session.Pipe.Dispose();
@@ -107,10 +112,10 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
                 ToolCollection = [McpServerTool.Create(() => new
                 {
                     service = "SQL Server DevLens MCP", status = "running", transport = "desktop-pipe",
-                    sqlConfigured = false, sqlConnected = false, lastSqlTestSucceeded = true, lastSqlTestUtc = sqlTestedAt,
+                    sqlConfigured = _database is not null, sqlConnected = false, database = _database?.Database, lastSqlTestSucceeded = true, lastSqlTestUtc = sqlTestedAt,
                     postmanImplemented = false,
-                    message = "SQL connection was tested at the recorded time and disposed. Status tool only; no live SQL session or inspection tools."
-                }, new() { Name = "get_server_status", Description = "Returns the desktop-controlled MCP server status and last SQL test time; does not query SQL." })]
+                    message = "SQL connections open per operation and are disposed. Read-only tools use the selected database; no persistent SQL session. Postman is not implemented."
+                }, new() { Name = "get_server_status", Description = "Returns the desktop-controlled MCP server status and last SQL test time; does not query SQL." }), ..new DatabaseTools(_database).CreateTools()]
             });
             await server.RunAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -145,6 +150,7 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
             Task[] pending;
             lock (_sessionGate) pending = _sessions.Select(session => session.Completion).ToArray();
             await Task.WhenAll(pending).ConfigureAwait(false);
+            _database?.Dispose(); _database = null;
             _shutdown.Dispose(); _shutdown = null; _listener = null; _acceptLoop = null;
         }
         finally { _lifecycle.Release(); }

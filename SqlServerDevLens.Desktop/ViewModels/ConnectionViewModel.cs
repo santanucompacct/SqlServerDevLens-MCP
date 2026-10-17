@@ -11,7 +11,7 @@ namespace SqlServerDevLens.Desktop.ViewModels;
 
 public partial class ConnectionViewModel : ViewModelBase
 {
-    public event Func<ConnectionProfile, Task>? ConnectionSucceeded;
+    public event Func<ConnectionProfile, string?, Task>? ConnectionSucceeded;
     private readonly IConnectionTester _tester;
     private readonly IProfileStore _profiles;
     private readonly ICredentialStore _credentials;
@@ -79,6 +79,7 @@ public partial class ConnectionViewModel : ViewModelBase
     private async Task TestConnectionAsync()
     {
         ConnectionProfile? testedProfile = null;
+        string? testedPassword = null;
         IsBusy = true;
         try
         {
@@ -92,7 +93,7 @@ public partial class ConnectionViewModel : ViewModelBase
             Status = result.Message;
             if (result.Success)
             {
-                testedProfile = profile;
+                testedProfile = profile; testedPassword = Password;
                 var previous = await _profiles.LoadAsync();
                 // Delete the old secret before replacing/removing its profile so it remains discoverable on failure.
                 if (_credentials.IsAvailable && previous is not null)
@@ -104,14 +105,15 @@ public partial class ConnectionViewModel : ViewModelBase
                     await _credentials.SaveAsync(CredentialStores.ProfileId(profile), Password);
                     Status += " Profile saved; password saved securely in Windows Credential Manager.";
                 }
-                else Status += RememberProfile ? " Profile saved without password." : " No profile or password retained.";
+                else Status += RememberProfile ? " Profile saved without password." : " No profile or password saved to disk. Active credentials remain in desktop memory until the server stops.";
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Win32Exception or JsonException or ArgumentException)
         { Status = "SQL test finished, but profile/password changes could not be completed. Check local permissions and Windows Credential Manager; password was not saved to JSON."; }
         finally { Password = ""; IsBusy = false; }
         if (testedProfile is not null && ConnectionSucceeded is not null)
-            await ConnectionSucceeded(testedProfile);
+            await ConnectionSucceeded(testedProfile, testedPassword);
+        testedPassword = null;
     }
 
     [RelayCommand]

@@ -37,7 +37,7 @@ public class ServerTests
         await pipe.ConnectAsync(cancellationToken);
         await using var client = await McpClient.CreateAsync(new StreamClientTransport(pipe, pipe), cancellationToken: cancellationToken);
         var tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
-        Assert.Single(tools); Assert.Equal("get_server_status", tools[0].Name);
+        Assert.Equal(5, tools.Count); Assert.Contains(tools, t => t.Name == "get_server_status");
         var result = await client.CallToolAsync("get_server_status", cancellationToken: cancellationToken);
         var text = Assert.IsType<TextContentBlock>(result.Content[0]).Text;
         var status = JsonDocument.Parse(text).RootElement;
@@ -82,7 +82,7 @@ public class ServerTests
             Command = "dotnet", Arguments = [dll, "--desktop", "--pipe-name", name]
         }), cancellationToken: timeout.Token);
         var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-        Assert.Single(tools);
+        Assert.Equal(5, tools.Count);
         var result = await client.CallToolAsync("get_server_status", cancellationToken: timeout.Token);
         Assert.NotEmpty(result.Content);
         await server.StopAsync();
@@ -111,6 +111,7 @@ public class ServerTests
         { Host = "localhost", Database = "Example", Username = "fake", Password = "fake" };
         var model = new MainViewModel(connection, new ServerViewModel(runtime));
         await model.ContinueCommand.ExecuteAsync(null);
+        connection.Password = "fake";
         await connection.TestConnectionCommand.ExecuteAsync(null);
         Assert.True(model.IsServerStepVisible); Assert.False(model.IsConnectionStepVisible);
         Assert.True(model.Server.IsRunning); Assert.Empty(connection.Password);
@@ -132,6 +133,7 @@ public class ServerTests
         { Host = "localhost", Database = "Example", Username = "fake", Password = "fake" };
         var model = new MainViewModel(connection, new ServerViewModel(runtime));
         await model.ContinueCommand.ExecuteAsync(null);
+        connection.Password = "fake";
         await connection.TestConnectionCommand.ExecuteAsync(null);
         Assert.False(model.Server.IsRunning);
         Assert.Equal(sqlSuccess, model.IsServerStepVisible);
@@ -154,7 +156,7 @@ public class ServerTests
         public bool FailStartup;
         public bool IsRunning { get; private set; }
         public event Action? StoppedUnexpectedly { add { } remove { } }
-        public Task StartAsync(DateTimeOffset sqlTestedAt)
+        public Task StartAsync(DateTimeOffset sqlTestedAt, SqlServerDevLens.Core.ISqlDatabase? database = null)
         { if (FailStartup) throw new IOException(); IsRunning = true; return Task.CompletedTask; }
         public Task StopAsync() { IsRunning = false; return Task.CompletedTask; }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;

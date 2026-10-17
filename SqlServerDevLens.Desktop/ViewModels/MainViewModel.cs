@@ -25,11 +25,11 @@ public class MainViewModel : ViewModelBase
     public MainViewModel(ConnectionViewModel connection, ServerViewModel server)
     {
         Connection = connection; Server = server;
-        Connection.ConnectionSucceeded += async profile =>
+        Connection.ConnectionSucceeded += async (profile, password) =>
         {
             if (_shuttingDown) return;
             IsServerStepVisible = true;
-            await Server.StartAsync(profile, Connection.Status);
+            await Server.StartAsync(profile, Connection.Status, password);
         };
         ContinueCommand = new AsyncRelayCommand(async () => { await Connection.LoadAsync(); IsChoosingMode = false; });
         BackCommand = new RelayCommand(() => { Connection.Password = ""; IsChoosingMode = true; });

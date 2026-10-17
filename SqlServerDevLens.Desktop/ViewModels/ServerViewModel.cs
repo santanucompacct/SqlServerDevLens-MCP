@@ -28,14 +28,16 @@ public partial class ServerViewModel : ViewModelBase
     }
     partial void OnIsRunningChanged(bool value) { OnPropertyChanged(nameof(CanStop)); OnPropertyChanged(nameof(CanReturn)); }
     partial void OnIsBusyChanged(bool value) { OnPropertyChanged(nameof(CanStop)); OnPropertyChanged(nameof(CanReturn)); }
-    public async Task StartAsync(ConnectionProfile profile, string notice)
+    public async Task StartAsync(ConnectionProfile profile, string notice, string? password = null)
     {
         IsBusy = true; Status = "Starting MCP server…";
         ConnectionSummary = $"{profile.Host}:{profile.Port} / {profile.Database}";
         ConnectionNotice = notice;
         try
         {
-            await _server.StartAsync(DateTimeOffset.UtcNow);
+            var database = new SqlDatabase(profile, password);
+            try { await _server.StartAsync(DateTimeOffset.UtcNow, database); }
+            catch { database.Dispose(); throw; }
             IsRunning = _server.IsRunning;
             Status = IsRunning ? "Running — local MCP server is available" : "Server could not start. Test the connection again.";
             if (!IsRunning) await _server.StopAsync();
