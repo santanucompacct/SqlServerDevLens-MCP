@@ -1,0 +1,4 @@
+interface:
+  display_name: "DevLens SQL and Postman"
+  short_description: "Inspect SQL and use approved SQL/Postman actions"
+  default_prompt: "Use $devlens-workflow to check the active DevLens connection and help with my SQL or Postman task."

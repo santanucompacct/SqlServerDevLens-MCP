@@ -1,5 +1,11 @@
 # Release notes
 
+## 0.8.2 — Bundled DevLens workflow skill (2026-10-17)
+
+- Packaged `devlens-workflow` with focused SQL/Postman references and skill-picker metadata. Relevant tasks may select it automatically; explicit selection is also supported by the host.
+- Guides active-context checks, bounded inspection, procedure/table/Postman tool selection, exact-action approval/status/apply, read-back verification and uncertain-outcome handling. It includes no private business schema, data or account credentials and cannot grant approval or database rights.
+- Bumped both plugin manifests while preserving plugin identity and MCP wiring. Refresh the plugin and restart the chat app to load the skill; this change does not require a desktop application rebuild.
+
 ## 0.8.1 — Server activity panel (2026-10-17)
 
 - Added a connection help file, first-time local-plugin setup prompt and separate existing-chat SQL-only/SQL + Postman prompts. In-app Help includes Copy buttons and a full-guide link, with local execution/discovery limitations explained.

@@ -34,6 +34,8 @@ OpenAI documents [local marketplaces and installation](https://developers.openai
 
 ## 2. Use SQL only in an existing chat
 
+Plugin **0.8.2** includes the **DevLens SQL and Postman** skill (`devlens-workflow`). The host can choose it for relevant DevLens tasks. You can explicitly select it in the skill picker; Codex can display the plugin-qualified name `sql-server-devlens:devlens-workflow`. Select the entry shown by your host. If it is missing, update/reinstall the plugin and restart ChatGPT once. The prompts below also work as ordinary instructions; they cannot force a missing skill or tool to load. Installing on a different account does not copy your business rules or credentials.
+
 In DevLens choose **SQL Server Only**, enter one database and select **Test Connection**. Leave its server screen showing **Running**.
 
 Open the existing chat in a locally executed desktop Work/Codex context. Select/enable **SQL Server DevLens** if offered, or type `@` and select its installed plugin entry when available. Paste:
