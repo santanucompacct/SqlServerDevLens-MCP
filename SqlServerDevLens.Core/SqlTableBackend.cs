@@ -141,7 +141,8 @@ public sealed partial class SqlProcedureBackend
         var keys = new[] { "columns", "indexes", "checks", "foreignKeys", "triggers" }; var size = 0;
         for (var i = 0; i < keys.Length; i++)
         {
-            var json = reader.GetString(i); size += json.Length;
+            // Empty FOR JSON catalog subqueries can be SQL NULL (for example, no triggers).
+            var json = reader.IsDBNull(i) ? "[]" : reader.GetString(i); size += json.Length;
             if (size > 128000) throw new ArgumentException("Table schema exceeds the 128,000-character review limit. No action applied.");
             using var document = JsonDocument.Parse(json); metadata[keys[i]] = document.RootElement.Clone();
         }
