@@ -1,5 +1,13 @@
 # Release notes
 
+## 0.9.0 — SQL + Postman milestone and Windows distribution (2026-10-17)
+
+- Consolidates the approved SQL/Postman workflows, connection help, bundled skill and activity panel on the default master branch.
+- Adds a Windows x64 self-contained desktop/adapter ZIP for users without Visual Studio or separately installed .NET. The release copy launches its adapter EXE; development MCP wiring stays framework-dependent.
+- Includes plugin/skill/marketplace, setup and launch files, connection help, project license, dependency license metadata/notices and SHA256 checksum. No private profiles, keys, data or backups are copied.
+- Setup uses the existing desktop Codex CLI, preserves unrelated marketplace sources and stops on a conflicting DevLens source. It does not bundle ChatGPT/Codex or bypass account/workspace requirements. Existing-source migration remains explicit.
+- Reproducible packaging checks protocol-only EXE output, native desktop startup, archive/checksum and Windows PowerShell 5.1 setup using simulated fresh/repeat/conflict cases and paths with spaces. CI builds release assets; a different recipient account/machine must verify its own local plugin access and connection.
+
 ## 0.8.3 — Recipient installation instructions (2026-10-17)
 
 - Included INSTALL.md inside the plugin, with another-user/account setup prompt, source-build/local-marketplace commands, prebuilt-package contents and tools/skill verification.

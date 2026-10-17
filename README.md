@@ -2,15 +2,17 @@
 
 **Your SQL Server, understood by AI.** MIT-licensed .NET 10 / Avalonia desktop application with owl branding.
 
-## Version 0.8.3: installation guide included in the plugin
+## Version 0.9.0: SQL + Postman and Windows portable distribution
+
+**No Visual Studio? [Download and setup the Windows x64 portable package](distribution/README.md).** It bundles the desktop app, .NET runtime, MCP adapter EXE, skill and plugin setup files. Compiled ZIP/checksum downloads are GitHub Release assets; the distribution folder holds reproducible packaging/setup instructions.
 
 First-time setup or starting work in an existing chat: **[Connection guide and copyable SQL / SQL + Postman prompts](docs/CONNECTING-TO-CHATGPT.md)**. The in-app Help window includes Copy buttons for these prompts.
 
 Sharing with another user/account: the plugin now includes **[INSTALL.md](plugins/sql-server-devlens/INSTALL.md)** with a recipient setup prompt, source/prebuilt installation paths and checks that both the tools and bundled skill are discovered. Share the whole package; the application EXE alone does not install the skill. The full connection guide's setup prompt includes these checks.
 
-Plugin 0.8.2 bundles **[devlens-workflow](plugins/sql-server-devlens/skills/devlens-workflow/SKILL.md)** with SQL and Postman references. It guides connection checks, tool choice, read-only inspection, exact-action desktop approval, verification and handling uncertain outcomes. Skill selection is enabled by default when relevant; explicitly select/invoke it if the host does not choose it. It does not transfer private business context or grant tools, database rights or approval.
+Plugin 0.9.0 bundles **[devlens-workflow](plugins/sql-server-devlens/skills/devlens-workflow/SKILL.md)** with SQL and Postman references. It guides connection checks, tool choice, read-only inspection, exact-action desktop approval, verification and handling uncertain outcomes. Skill selection is enabled by default when relevant; explicitly select/invoke it if the host does not choose it. It does not transfer private business context or grant tools, database rights or approval.
 
-To refresh an existing installation, pull this branch and follow the publish/install commands below, then fully restart ChatGPT Desktop once. The skill is delivered in the plugin package, not by the MCP tool response. This skill-only update does not require rebuilding the already-current DevLens desktop application. Another account/computer must install and enable the updated plugin separately; availability and automatic selection still depend on its host/chat. Check the installed package/skill after upgrading rather than assuming an existing chat has reloaded it.
+To refresh an existing source installation, pull master and follow the build/publish/install commands below, then fully restart ChatGPT Desktop once. Portable users follow the distribution guide. The skill is delivered in the plugin package, not by the MCP tool response. Another account/computer must install and enable the updated plugin separately; availability and automatic selection still depend on its host/chat. Check the installed package/skill after upgrading rather than assuming an existing chat has reloaded it.
 
 Completed: inspect table structure/data and procedure definitions; execute procedures with parameters and multiple result sets; create/modify procedures; create tables, add/alter columns, insert rows and update rows. Every procedure execution/change and table write requires explicit approval in DevLens. See [release notes](CHANGELOG.md) for verified coverage and limits. Postman setup, selected-collection metadata and explicitly approved folder/request creation, editing and supported HTTP execution are available.
 
@@ -54,7 +56,7 @@ Execution uses parameterized SqlCommand with CommandType.StoredProcedure, a fres
 
 Example workflow: ask to read dbo.Example; discuss the logic; prepare an execution with fake/test parameters or prepare a complete ALTER/CREATE; inspect the DevLens window and approve/reject; then ask the assistant to execute/apply that approved request. These are capability changes only; the agent does not run or alter production procedures as part of building them.
 
-Procedure integration tests run only against an explicitly configured disposable localhost SQL Server, creating/dropping a uniquely named DevLensTest database. CI starts a short-lived SQL Server 2022 container with a randomly generated masked password, exercises real create/multiple-result execution/output/return code/ALTER/backup/stale revision/result limits and removes it. It never reads a saved production profile. Local tests skip this unless DEVLENS_PROCEDURE_TEST_CONNECTION_STRING points to localhost:1433 and DEVLENS_PROCEDURE_TEST_ALLOW_DATABASE_CREATE=1. Native ChatGPT procedure discovery and manual review-window behavior must still be checked after rebuilding DevLens, publishing/reinstalling 0.8.2 and restarting ChatGPT once.
+Procedure integration tests run only against an explicitly configured disposable localhost SQL Server, creating/dropping a uniquely named DevLensTest database. CI starts a short-lived SQL Server 2022 container with a randomly generated masked password, exercises real create/multiple-result execution/output/return code/ALTER/backup/stale revision/result limits and removes it. It never reads a saved production profile. Local tests skip this unless DEVLENS_PROCEDURE_TEST_CONNECTION_STRING points to localhost:1433 and DEVLENS_PROCEDURE_TEST_ALLOW_DATABASE_CREATE=1. Native ChatGPT procedure discovery and manual review-window behavior must still be checked after rebuilding DevLens, publishing/reinstalling 0.9.0 and restarting ChatGPT once.
 
 ## Approved table SQL (plugin 0.6.1)
 
@@ -70,7 +72,7 @@ The row limit covers direct INSERT/UPDATE rows, **not ALTER's existing data, tri
 
 Before ALTER TABLE, catalog metadata for columns/defaults/computed expressions, indexes, checks, visible foreign keys and table triggers is saved with owner-restricted permissions in `LocalApplicationData/SqlServerDevLens/TableSchemaBackups`. Failure blocks application. This JSON snapshot is **not table data, a complete database/schema backup, or a runnable restore script**. CREATE has no previous schema; DML does not export before-images of table rows. The approval window explicitly states these limits.
 
-Synthetic tests validate parser restrictions, approval forgery/wrong-action/replay rejection and transport. The disposable localhost SQL Server integration test exercises real CREATE/INSERT/UPDATE/ALTER, direct counts, review drift, constraint rollback, private metadata snapshots, backup failure and a SQL login denied writes despite desktop approval. It never contacts a production profile. Native ChatGPT table-tool discovery and manual desktop approval remain a user upgrade check: rebuild DevLens, reinstall plugin 0.8.2 and restart ChatGPT once.
+Synthetic tests validate parser restrictions, approval forgery/wrong-action/replay rejection and transport. The disposable localhost SQL Server integration test exercises real CREATE/INSERT/UPDATE/ALTER, direct counts, review drift, constraint rollback, private metadata snapshots, backup failure and a SQL login denied writes despite desktop approval. It never contacts a production profile. Native ChatGPT table-tool discovery and manual desktop approval remain a user upgrade check: rebuild DevLens, reinstall plugin 0.9.0 and restart ChatGPT once.
 
 ## Live server activity (desktop 0.8.1)
 
@@ -78,9 +80,9 @@ The existing server panel has two columns: scrollable server information and Sto
 
 This is operational feedback, not an audit trail or proof that a change committed. Completed means the tool call returned; preparing, approval and applying are separate steps. Check the tool result in chat, particularly after errors/timeouts. Only tool names, generated request numbers, states and fixed messages are logged. SQL, arguments, credentials, bodies, results and raw exception messages are excluded. The latest 200 events stay in desktop memory across Stop/Start and disappear when the application closes. No log files or stdout output are created.
 
-For this desktop-only update, pull `feature/postman-setup`, close DevLens, rebuild in Visual Studio 2026 and start without debugging (Ctrl+F5). Reconnect SQL/Postman as usual. The existing 0.8.0 adapter works unchanged; no plugin reinstall or ChatGPT restart is required for this panel.
+For this desktop-only update, pull `master`, close DevLens, rebuild in Visual Studio 2026 and start without debugging (Ctrl+F5). Reconnect SQL/Postman as usual. The existing 0.8.0 adapter works unchanged; no plugin reinstall or ChatGPT restart is required for this panel.
 
-## Postman setup and approved actions (plugin 0.8.2)
+## Postman setup and approved actions (plugin 0.9.0)
 
 Choose SQL Server + Postman, test SQL, enter the key locally, Load Workspaces, select a workspace, Load Collections, select a collection and Start MCP Server. SQL-only startup and SQL query/procedure/table logic remain intact. Remember key uses the separate Windows Credential Manager entry `SqlServerDevLens/PostmanApiKey`; Forget removes it. macOS/Linux secure saving is disabled. No Postman profile JSON is written. The active desktop now keeps the Postman key in memory until Stop even when Remember is unchecked, so approved tools can access the selected collection. The key never goes to the adapter or chat. Managed strings cannot be guaranteed zeroed.
 
@@ -122,7 +124,7 @@ When running with SQL configured, expect `sqlConfigured: true`, `sqlConnected: f
 
 ## Pull and run in Visual Studio 2026
 
-The Postman/workflow-skill preview is currently on `feature/postman-setup` until its PR is merged. For this preview, substitute that branch for `master` in the commands below. The merged SQL milestone remains available at `v0.6.1`.
+Use the default branch `master` for the completed SQL/Postman milestone. The older SQL milestone remains available at `v0.6.1`.
 
 Install Visual Studio 2026 with .NET desktop development and .NET 10 SDK. In your existing clone:
 

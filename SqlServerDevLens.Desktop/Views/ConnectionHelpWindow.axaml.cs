@@ -10,9 +10,9 @@ public partial class ConnectionHelpWindow : Window
     public ConnectionHelpWindow() { InitializeComponent(); }
     private void Close_Click(object? sender, RoutedEventArgs e) => Close();
     private async void Readme_Click(object? sender, RoutedEventArgs e) => await OpenLinkAsync(
-        "https://github.com/santanucompacct/SqlServerDevLens-MCP/blob/feature/postman-setup/README.md#publishinstall-and-test-the-local-plugin");
+        "https://github.com/santanucompacct/SqlServerDevLens-MCP/blob/master/README.md#publishinstall-and-test-the-local-plugin");
     private async void Guide_Click(object? sender, RoutedEventArgs e) => await OpenLinkAsync(
-        "https://github.com/santanucompacct/SqlServerDevLens-MCP/blob/feature/postman-setup/docs/CONNECTING-TO-CHATGPT.md");
+        "https://github.com/santanucompacct/SqlServerDevLens-MCP/blob/master/docs/CONNECTING-TO-CHATGPT.md");
     private async void CopyPrompt_Click(object? sender, RoutedEventArgs e)
     {
         var text = sender is Button { Tag: string name } ? this.FindControl<SelectableTextBlock>(name)?.Text : null;

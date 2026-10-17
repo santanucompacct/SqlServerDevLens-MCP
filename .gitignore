@@ -389,3 +389,4 @@ plugins/*/server/
 **/ProcedureBackups/
 **/TableSchemaBackups/
 **/PostmanBackups/
+distribution/packages/
