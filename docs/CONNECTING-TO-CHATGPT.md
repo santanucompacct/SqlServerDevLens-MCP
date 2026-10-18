@@ -2,9 +2,11 @@
 
 This guide covers first-time local-plugin installation and starting SQL or SQL + Postman work in an existing chat. Checked against official OpenAI documentation on 17 October 2026.
 
+For first installation or an existing source/portable upgrade, follow [Install and upgrade](https://github.com/santanucompacct/SqlServerDevLens-MCP/blob/master/docs/INSTALL-AND-UPGRADE.md). A build alone does not refresh the installed adapter/tool catalog.
+
 ## Before you start
 
-For a machine without Visual Studio/.NET, use the [Windows x64 portable distribution](../distribution/README.md): extract it, run Install-Plugin.cmd, restart ChatGPT once, then Start-DevLens.cmd. Skip the source-build prompt below when using that package. Its setup installs the bundled adapter EXE and skill.
+For a machine without Visual Studio/.NET, use the [Windows x64 portable distribution](https://github.com/santanucompacct/SqlServerDevLens-MCP/releases/tag/v0.11.0): extract it, run Install-Plugin.cmd, restart ChatGPT once, then Start-DevLens.cmd. Skip the source-build prompt below when using that package. Its setup installs the bundled adapter EXE and skill.
 
 - Use the ChatGPT desktop app on the same computer as DevLens, with a chat running locally in Work/Codex. This stdio plugin needs local execution; opening a desktop window alone does not make every chat local.
 - ChatGPT Plus or higher is the supported setup for this DevLens guide. This is not a claim that Plus is OpenAI's universal minimum. Local-plugin access also depends on the app, account and workspace policy; check availability before subscribing.
@@ -40,7 +42,7 @@ OpenAI documents [local marketplaces and installation](https://developers.openai
 
 Give the recipient the source-project link or a complete prepared plugin plus the compatible DevLens desktop application. **[Installation instructions are included inside the plugin](../plugins/sql-server-devlens/INSTALL.md)**, including a recipient setup prompt, manual commands, required package contents and skill-discovery checks. Installing the whole plugin brings its skill along automatically. The recipient does not recreate the skill or copy this conversation. They enable/verify the plugin in their local host and enter their own authorized SQL/Postman details. An account using an existing correct installation can verify/enable it rather than making duplicate copies.
 
-Plugin **0.9.0** includes the **DevLens SQL and Postman** skill (`devlens-workflow`). The host can choose it for relevant DevLens tasks. You can explicitly select it in the skill picker; Codex can display the plugin-qualified name `sql-server-devlens:devlens-workflow`. Select the entry shown by your host. If it is missing, update/reinstall the plugin and restart ChatGPT once. The prompts below also work as ordinary instructions; they cannot force a missing skill or tool to load. Installing on a different account does not copy your business rules or credentials.
+Plugin **0.11.0** includes the **DevLens SQL and Postman** skill (`devlens-workflow`). The host can choose it for relevant DevLens tasks. You can explicitly select it in the skill picker; Codex can display the plugin-qualified name `sql-server-devlens:devlens-workflow`. Select the entry shown by your host. If it is missing, update/reinstall the plugin and restart ChatGPT once. The prompts below also work as ordinary instructions; they cannot force a missing skill or tool to load. Installing on a different account does not copy your business rules or credentials.
 
 In DevLens choose **SQL Server Only**, enter one database and select **Test Connection**. Leave its server screen showing **Running**.
 
