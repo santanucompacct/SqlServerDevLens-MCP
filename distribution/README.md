@@ -12,6 +12,12 @@ The ZIP includes the self-contained desktop app and MCP adapter, plugin manifest
 
 See [README-FIRST.txt](README-FIRST.txt) for conflicts, prerequisites, checksum/unsigned-build information and privacy. Another account/computer must verify its own access and setup.
 
+## Skill available but MCP tools missing in the 0.9.0 ZIP
+
+The initial portable package used an invalid executable command. The Agent Plugins loader reports `Agent Plugins stdio command must be a bare executable name or a contained ./ path`; it can still load the workflow skill while omitting the MCP server.
+
+In the extracted package's `plugins/sql-server-devlens/mcp.json`, change only `command` to `./server/SqlServerDevLens.McpHost.exe`. Keep `args` and `cwd` unchanged. Rerun **Install-Plugin.cmd** from that same registered package folder, then fully quit/reopen the chat app. Keep the DevLens server running. No desktop rebuild or credential changes are needed. Ask for `get_server_status` and verify that the chat calls the native tool; a direct EXE test alone does not establish chat integration.
+
 ## Build the package from source
 
 Maintainers need .NET 10 SDK and PowerShell 7 on Windows:

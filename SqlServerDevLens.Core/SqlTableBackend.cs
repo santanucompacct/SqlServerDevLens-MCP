@@ -21,6 +21,14 @@ public sealed partial class SqlProcedureBackend
 {
     private readonly ITableSchemaBackupStore _tableBackups = tableBackups ?? new PrivateTableSchemaBackupStore();
     private sealed record SchemaSnapshot(string Revision, string Metadata);
+    public Task<TableSchemaDefinition> ReadSchemaAsync(string schema, string name, CancellationToken token) => Safe(async ct =>
+    {
+        ProcedureSql.ValidateName(schema, name);
+        await using var connection = await OpenAsync(ct);
+        var snapshot = await ReadTableSchema(connection, null, new(schema, name, "", "", 1, null, 0), ct)
+            ?? throw new ArgumentException("Table not found or not visible.");
+        return new TableSchemaDefinition(schema, name, snapshot.Metadata, snapshot.Revision);
+    }, token);
     public Task<TableSqlSnapshot> PrepareTableAsync(TableSqlPlan plan, CancellationToken token) => Safe(async ct =>
     {
         plan = TableSql.Validate(plan.Schema, plan.Name, plan.Sql, plan.MaxRows);
@@ -98,22 +106,22 @@ public sealed partial class SqlProcedureBackend
             FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id
             WHERE s.name=@schema AND t.name=@name AND t.is_ms_shipped=0;
             SELECT
-            SUBSTRING((SELECT c.column_id,c.name,ty.name AS type_name,c.max_length,c.precision,c.scale,c.is_nullable,c.collation_name,
+            (SELECT c.column_id,c.name,ty.name AS type_name,c.max_length,c.precision,c.scale,c.is_nullable,c.collation_name,
                 c.is_identity,CONVERT(nvarchar(100),id.seed_value) AS identity_seed,CONVERT(nvarchar(100),id.increment_value) AS identity_increment,
                 dc.name AS default_name,dc.definition AS default_sql,cc.definition AS computed_sql,cc.is_persisted
                 FROM sys.columns c JOIN sys.types ty ON ty.user_type_id=c.user_type_id
                 LEFT JOIN sys.identity_columns id ON id.object_id=c.object_id AND id.column_id=c.column_id
                 LEFT JOIN sys.default_constraints dc ON dc.object_id=c.default_object_id
                 LEFT JOIN sys.computed_columns cc ON cc.object_id=c.object_id AND cc.column_id=c.column_id
-                WHERE c.object_id=OBJECT_ID(QUOTENAME(@schema)+'.'+QUOTENAME(@name),'U') ORDER BY c.column_id FOR JSON PATH,INCLUDE_NULL_VALUES),1,128001),
-            SUBSTRING((SELECT i.index_id,i.name,i.type_desc,i.is_unique,i.is_primary_key,i.is_unique_constraint,i.filter_definition,i.is_disabled,
+                WHERE c.object_id=OBJECT_ID(QUOTENAME(@schema)+'.'+QUOTENAME(@name),'U') ORDER BY c.column_id FOR JSON PATH,INCLUDE_NULL_VALUES),
+            (SELECT i.index_id,i.name,i.type_desc,i.is_unique,i.is_primary_key,i.is_unique_constraint,i.filter_definition,i.is_disabled,
                 ic.key_ordinal,ic.index_column_id,ic.is_included_column,ic.is_descending_key,c.name AS column_name
                 FROM sys.indexes i LEFT JOIN sys.index_columns ic ON ic.object_id=i.object_id AND ic.index_id=i.index_id
                 LEFT JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id
-                WHERE i.object_id=OBJECT_ID(QUOTENAME(@schema)+'.'+QUOTENAME(@name),'U') ORDER BY i.index_id,ic.index_column_id FOR JSON PATH,INCLUDE_NULL_VALUES),1,128001),
-            SUBSTRING((SELECT name,definition,is_disabled,is_not_trusted FROM sys.check_constraints
-                WHERE parent_object_id=OBJECT_ID(QUOTENAME(@schema)+'.'+QUOTENAME(@name),'U') ORDER BY name FOR JSON PATH,INCLUDE_NULL_VALUES),1,128001),
-            SUBSTRING((SELECT f.name,f.is_disabled,f.is_not_trusted,f.delete_referential_action_desc,f.update_referential_action_desc,
+                WHERE i.object_id=OBJECT_ID(QUOTENAME(@schema)+'.'+QUOTENAME(@name),'U') ORDER BY i.index_id,ic.index_column_id FOR JSON PATH,INCLUDE_NULL_VALUES),
+            (SELECT name,definition,is_disabled,is_not_trusted FROM sys.check_constraints
+                WHERE parent_object_id=OBJECT_ID(QUOTENAME(@schema)+'.'+QUOTENAME(@name),'U') ORDER BY name FOR JSON PATH,INCLUDE_NULL_VALUES),
+            (SELECT f.name,f.is_disabled,f.is_not_trusted,f.delete_referential_action_desc,f.update_referential_action_desc,
                 pc.name AS parent_column,ps.name AS parent_schema,pt.name AS parent_table,
                 rc.name AS referenced_column,rs.name AS referenced_schema,rt.name AS referenced_table
                 FROM sys.foreign_keys f JOIN sys.foreign_key_columns fc ON fc.constraint_object_id=f.object_id
@@ -122,10 +130,10 @@ public sealed partial class SqlProcedureBackend
                 JOIN sys.tables rt ON rt.object_id=f.referenced_object_id JOIN sys.schemas rs ON rs.schema_id=rt.schema_id
                 JOIN sys.columns rc ON rc.object_id=rt.object_id AND rc.column_id=fc.referenced_column_id
                 WHERE f.parent_object_id=OBJECT_ID(QUOTENAME(@schema)+'.'+QUOTENAME(@name),'U') OR f.referenced_object_id=OBJECT_ID(QUOTENAME(@schema)+'.'+QUOTENAME(@name),'U')
-                ORDER BY f.name,fc.constraint_column_id FOR JSON PATH,INCLUDE_NULL_VALUES),1,128001),
-            SUBSTRING((SELECT tr.name,tr.is_disabled,tr.is_instead_of_trigger,m.definition,m.uses_ansi_nulls,m.uses_quoted_identifier
+                ORDER BY f.name,fc.constraint_column_id FOR JSON PATH,INCLUDE_NULL_VALUES),
+            (SELECT tr.name,tr.is_disabled,tr.is_instead_of_trigger,m.definition,m.uses_ansi_nulls,m.uses_quoted_identifier
                 FROM sys.triggers tr LEFT JOIN sys.sql_modules m ON m.object_id=tr.object_id
-                WHERE tr.parent_id=OBJECT_ID(QUOTENAME(@schema)+'.'+QUOTENAME(@name),'U') ORDER BY tr.name FOR JSON PATH,INCLUDE_NULL_VALUES),1,128001);
+                WHERE tr.parent_id=OBJECT_ID(QUOTENAME(@schema)+'.'+QUOTENAME(@name),'U') ORDER BY tr.name FOR JSON PATH,INCLUDE_NULL_VALUES);
             """;
         command.Parameters.Add("@schema", SqlDbType.NVarChar, 128).Value = plan.Schema;
         command.Parameters.Add("@name", SqlDbType.NVarChar, 128).Value = plan.Name;
@@ -138,12 +146,11 @@ public sealed partial class SqlProcedureBackend
         await reader.NextResultAsync(token); await reader.ReadAsync(token);
         var metadata = new Dictionary<string, object?> { ["database"] = connection.Database, ["schema"] = plan.Schema, ["table"] = plan.Name,
             ["objectId"] = objectId, ["modified"] = modified, ["notice"] = "Catalog metadata only. This is NOT a row backup or a complete restore/deployment script." };
-        var keys = new[] { "columns", "indexes", "checks", "foreignKeys", "triggers" }; var size = 0;
+        var keys = new[] { "columns", "indexes", "checks", "foreignKeys", "triggers" };
         for (var i = 0; i < keys.Length; i++)
         {
             // Empty FOR JSON catalog subqueries can be SQL NULL (for example, no triggers).
-            var json = reader.IsDBNull(i) ? "[]" : reader.GetString(i); size += json.Length;
-            if (size > 128000) throw new ArgumentException("Table schema exceeds the 128,000-character review limit. No action applied.");
+            var json = reader.IsDBNull(i) ? "[]" : reader.GetString(i);
             using var document = JsonDocument.Parse(json); metadata[keys[i]] = document.RootElement.Clone();
         }
         var text = JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true });

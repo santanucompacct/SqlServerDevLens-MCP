@@ -24,6 +24,29 @@ public class ProcedureTransportTests
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(40));
         await using var client = await McpClient.CreateAsync(new StdioClientTransport(new()
         { Command = "dotnet", Arguments = [dll, "--desktop", "--pipe-name", pipe] }), cancellationToken: timeout.Token);
+        var tableSchema = await client.CallToolAsync("get_table_schema", new Dictionary<string, object?>
+        { ["schema"] = "dbo", ["name"] = "Example", ["maxCharacters"] = 1000 }, cancellationToken: timeout.Token);
+        Assert.False(tableSchema.IsError ?? false);
+        using var schemaJson = JsonDocument.Parse(Assert.IsType<TextContentBlock>(tableSchema.Content[0]).Text);
+        Assert.Equal(1000, schemaJson.RootElement.GetProperty("nextOffset").GetInt32());
+        var tableRows = await client.CallToolAsync("read_table_page", new Dictionary<string, object?>
+        { ["schema"] = "dbo", ["name"] = "Example", ["columns"] = new[] { "id" }, ["offset"] = 500, ["pageSize"] = 10 }, cancellationToken: timeout.Token);
+        Assert.False(tableRows.IsError ?? false);
+        using var rowJson = JsonDocument.Parse(Assert.IsType<TextContentBlock>(tableRows.Content[0]).Text);
+        Assert.Equal(500, rowJson.RootElement.GetProperty("offset").GetInt32());
+        var first = await client.CallToolAsync("get_procedure_definition", new Dictionary<string, object?>
+        { ["schema"] = "dbo", ["name"] = "Example", ["maxCharacters"] = 1000 }, cancellationToken: timeout.Token);
+        Assert.False(first.IsError ?? false);
+        using var page = JsonDocument.Parse(Assert.IsType<TextContentBlock>(first.Content[0]).Text);
+        Assert.False(page.RootElement.GetProperty("complete").GetBoolean());
+        Assert.Equal(1000, page.RootElement.GetProperty("nextOffset").GetInt32());
+        var next = await client.CallToolAsync("get_procedure_definition", new Dictionary<string, object?>
+        { ["schema"] = "dbo", ["name"] = "Example", ["offset"] = 1000,
+            ["expectedRevision"] = page.RootElement.GetProperty("revision").GetString() }, cancellationToken: timeout.Token);
+        Assert.False(next.IsError ?? false);
+        var stalePage = await client.CallToolAsync("get_procedure_definition", new Dictionary<string, object?>
+        { ["schema"] = "dbo", ["name"] = "Example", ["offset"] = 1000, ["expectedRevision"] = "stale" }, cancellationToken: timeout.Token);
+        Assert.True(stalePage.IsError);
         var staged = await client.CallToolAsync("prepare_procedure_execution", new Dictionary<string, object?>
         { ["schema"] = "dbo", ["name"] = "Example", ["parametersJson"] = "{}" }, cancellationToken: timeout.Token);
         Assert.False(staged.IsError ?? false);
@@ -64,6 +87,11 @@ public class ProcedureTransportTests
     }
     private sealed class FakeDatabase(ProcedureWorkflow procedures) : ISqlDatabase
     {
+        public Task<TableDataPage> ReadTablePageAsync(string schema, string name, string[] columns, int offset, int pageSize, CancellationToken token)
+        {
+            Assert.Equal(new[] { "id" }, columns); Assert.Equal(10, pageSize); Assert.Equal("dbo", schema); Assert.Equal("Example", name);
+            return Task.FromResult(new TableDataPage(new("FakeDatabase", [new("id", "int")], [new object?[] { 501 }], false, false), offset, null, ["id"]));
+        }
         public string Database => "FakeDatabase";
         public ProcedureWorkflow Procedures => procedures;
         public void Dispose() => procedures.Dispose();
@@ -74,11 +102,13 @@ public class ProcedureTransportTests
     }
     private sealed class Backend : IProcedureBackend, ITableActionBackend
     {
+        public Task<TableSchemaDefinition> ReadSchemaAsync(string schema, string name, CancellationToken token) =>
+            Task.FromResult(new TableSchemaDefinition(schema, name, new string('x', 160000), "table-r1"));
         public string Database => "FakeDatabase"; public int Calls; public int TableCalls;
         public Task<TableSqlSnapshot> PrepareTableAsync(TableSqlPlan plan, CancellationToken token) => Task.FromResult(new TableSqlSnapshot(plan,"revision","fake schema",1));
         public Task<TableSqlResult> ApplyTableAsync(TableSqlSnapshot snapshot, CancellationToken token) { TableCalls++; return Task.FromResult(new TableSqlResult("committed",1,false)); }
         public Task<ProcedureDefinition?> ReadAsync(string schema, string name, CancellationToken token) =>
-            Task.FromResult<ProcedureDefinition?>(new(schema, name, "CREATE PROC dbo.Example AS SELECT 1", "fake-revision", true, true, []));
+            Task.FromResult<ProcedureDefinition?>(new(schema, name, "CREATE PROC dbo.Example AS /*" + new string('x', 160000) + "*/ SELECT 1", "fake-revision", true, true, []));
         public void ValidateParameters(ProcedureDefinition definition, string parametersJson) => ProcedureSql.Parameters(parametersJson);
         public async Task<ProcedureExecution> ExecuteAsync(ProcedureDefinition definition, string parametersJson, CancellationToken token)
         { Calls++; await Task.Delay(TimeSpan.FromSeconds(6), token); return new([], new Dictionary<string, object?>(), 0, true, "Finished"); }

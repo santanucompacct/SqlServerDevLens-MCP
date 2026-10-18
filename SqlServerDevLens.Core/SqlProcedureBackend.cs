@@ -42,7 +42,7 @@ public sealed partial class SqlProcedureBackend(string database, Func<string> co
     {
         await using var command = connection.CreateCommand(); command.CommandTimeout = 15;
         command.CommandText = """
-            SELECT o.object_id,o.modify_date,SUBSTRING(m.definition,1,128001),m.uses_ansi_nulls,m.uses_quoted_identifier
+            SELECT o.object_id,o.modify_date,m.definition,m.uses_ansi_nulls,m.uses_quoted_identifier
             FROM sys.procedures o JOIN sys.schemas s ON s.schema_id=o.schema_id
             LEFT JOIN sys.sql_modules m ON m.object_id=o.object_id
             WHERE s.name=@schema AND o.name=@name AND o.type='P' AND o.is_ms_shipped=0;
@@ -57,7 +57,6 @@ public sealed partial class SqlProcedureBackend(string database, Func<string> co
         if (!await reader.ReadAsync(token)) return null;
         if (reader.IsDBNull(2)) throw new InvalidOperationException("Full definition is unavailable. VIEW DEFINITION permission is required; encrypted/CLR procedures are unsupported.");
         var sql = reader.GetString(2);
-        if (sql.Length > 128000) throw new ArgumentException("Definition exceeds the 128,000-character review limit; it was not silently truncated.");
         var ansi = reader.GetBoolean(3); var quoted = reader.GetBoolean(4);
         var revision = ProcedureSql.Revision(sql, reader.GetInt32(0), reader.GetDateTime(1), ansi, quoted);
         var defaults = ProcedureSql.Parse(sql).Parameters.Where(p => p.Value is not null).Select(p => p.VariableName.Value).ToHashSet(StringComparer.Ordinal);

@@ -12,7 +12,7 @@ This query tool does not allow writes, EXEC, database switching, arbitrary batch
 
 ## Procedures
 
-Read `get_procedure_definition(schema, name)` for the current complete supported definition, revision and scalar parameters. Do not infer required parameters or report branches from a procedure's name.
+Read `get_procedure_definition(schema, name)` for the first definition page, full-definition revision and scalar parameters. Follow `nextOffset` using `offset` and the first page's `expectedRevision` until `complete` is true. Pages default to 32,000 UTF-16 code units; `maxCharacters` supports 256-128,000. On revision mismatch discard the pages and restart; never claim parity or prepare an edit from incomplete source. The full procedure has no application character cap. Do not infer required parameters or report branches from a procedure's name.
 
 | Intent | Prepare | Status | Apply once after approval |
 | --- | --- | --- | --- |
@@ -26,6 +26,10 @@ For a modification, read the full current definition, preserve unrelated branche
 Review all returned result sets, output parameters, return code, errors and bounds. Multiple result sets are not one flat table. A returned execution result does not imply a read-only operation or unrestricted output.
 
 ## Tables and row changes
+
+For large tables use `read_table_page(schema, name, columns, offset, pageSize)` with explicit exact columns; it requires a visible enabled primary key and orders by all key columns. Follow `nextOffset` (null ends the read), at most 500 rows per page. This is live offset paging, not a snapshot; concurrent writes may skip/repeat rows. Do not claim a consistent export. ValuesTruncated remains meaningful; long text/binary/complex values are still bounded or omitted.
+
+Use `get_table_schema` for paged columns/index/check/foreign-key/trigger metadata. Follow nextOffset with expectedRevision until complete, restarting on schema revision changes. Complete metadata is used internally for approval/rechecks and private ALTER backups without the old 128K cap. Metadata is not a row backup or a full restore script. SQL command length has no application cap for approved table actions; memory, transport and timeout limits remain. Never automatically split or apply bulk writes: each exact batch needs separate approval and at most 500 direct affected rows.
 
 Read current schema and, for updates, inspect the exact intended row selection first. Use `prepare_table_sql(schema, name, sql, maxAffectedRows)` → `get_table_request(requestId)` → `apply_table_sql(requestId)` after DevLens approval. Set a tight row limit matching user intent (supported 1–500, default 100); use an exact key/WHERE predicate for a single-row edit.
 

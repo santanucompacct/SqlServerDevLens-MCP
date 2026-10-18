@@ -1,5 +1,24 @@
 # Release notes
 
+## 0.11.0 - Large table inspection and approved changes (unreleased)
+
+- Add primary-key ordered live row paging with explicit columns and continuation offsets. Retain row/column/value response bounds and disclose concurrent-write consistency limits.
+- Add revision-checked table catalog metadata pages and remove the 128K schema-review and 20K approved table SQL caps. Full visible metadata remains in approval review, schema rechecks and private ALTER backups.
+- Retain 500 direct rows per approved write, exact scoped SQL, single-use approval and transaction/row-count checks. Row backups and automatic bulk updates are not provided.
+- Rebuild desktop and adapter, publish/refresh plugin and restart the chat app for the new tool schemas. Production tables were not modified during development.
+
+## 0.10.0 - Large stored procedures (unreleased)
+
+- Remove the 128,000-character cap from full procedure reads and CREATE/ALTER validation. Revision checks, explicit desktop approval and private full-definition backups remain in place.
+- Page definition responses with total length, next offset and completion state. Continuations require the full-definition revision and fail if the procedure changed; UTF-16 surrogate pairs are preserved.
+- Rebuild both desktop and stdio adapter, refresh the plugin and restart the chat app for the new paging schema. Memory, transport and timeout limits remain. No production procedure was changed or executed during development.
+
+## Unreleased — Windows portable plugin discovery
+
+- Fix the portable MCP command to `./server/SqlServerDevLens.McpHost.exe`. The local Agent Plugins loader rejects `${PLUGIN_ROOT}` in `command`, silently leaving the skill available without MCP tools. Arguments and working directory retain their supported configuration.
+- Check the package command and its resolved executable during extracted-distribution testing. Raw EXE protocol tests alone do not verify plugin discovery.
+- Existing 0.9.0 portable installations can correct this one field in `plugins/sql-server-devlens/mcp.json`, rerun `Install-Plugin.cmd`, then fully restart the chat app. The desktop application needs no rebuild. Native tool availability must still be checked in the restarted chat.
+
 ## 0.9.0 — SQL + Postman milestone and Windows distribution (2026-10-17)
 
 - Consolidates the approved SQL/Postman workflows, connection help, bundled skill and activity panel on the default master branch.

@@ -7,6 +7,8 @@ namespace SqlServerDevLens.Core;
 public sealed record SqlColumn(string Name, string Type);
 public sealed record SqlResult(string Database, IReadOnlyList<SqlColumn> Columns, IReadOnlyList<object?[]> Rows,
     bool Truncated, bool ValuesTruncated);
+public sealed record TableDataPage(SqlResult Data, int Offset, int? NextOffset, IReadOnlyList<string> OrderColumns,
+    string Consistency = "Live pages, not a snapshot. Concurrent row/key changes can cause skipped or repeated rows. ValuesTruncated applies to individual values.");
 
 public interface ISqlDatabase : IDisposable
 {
@@ -16,6 +18,8 @@ public interface ISqlDatabase : IDisposable
     Task<SqlResult> ListObjectsAsync(CancellationToken cancellationToken);
     Task<SqlResult> DescribeObjectAsync(string schema, string name, CancellationToken cancellationToken);
     Task<SqlResult> QueryAsync(string sql, int maxRows, CancellationToken cancellationToken);
+    Task<TableDataPage> ReadTablePageAsync(string schema, string name, string[] columns, int offset, int pageSize,
+        CancellationToken token) => throw new NotSupportedException("Update DevLens for table paging.");
 }
 
 // This object is owned by the running desktop, never serialized or sent to the adapter.
@@ -86,6 +90,35 @@ public sealed class SqlDatabase : ISqlDatabase
         ReadOnlySql.Validate(sql);
         if (maxRows is < 1 or > 500) throw new ArgumentException("maxRows must be between 1 and 500.");
         return ExecuteAsync(sql, maxRows, null, cancellationToken);
+    }
+
+    public async Task<TableDataPage> ReadTablePageAsync(string schema, string name, string[] columns, int offset,
+        int pageSize, CancellationToken token)
+    {
+        TablePaging.Validate(schema, name, columns, offset, pageSize);
+        var keys = await ExecuteAsync("""
+            SELECT c.name FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id
+            JOIN sys.indexes i ON i.object_id=t.object_id AND i.is_primary_key=1 AND i.is_disabled=0
+            JOIN sys.index_columns ic ON ic.object_id=i.object_id AND ic.index_id=i.index_id
+            JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id
+            WHERE s.name=@schema AND t.name=@name AND t.is_ms_shipped=0 AND ic.key_ordinal>0
+            ORDER BY ic.key_ordinal
+            """, 100, command =>
+        {
+            command.Parameters.Add("@schema", SqlDbType.NVarChar, 128).Value = schema;
+            command.Parameters.Add("@name", SqlDbType.NVarChar, 128).Value = name;
+        }, token);
+        if (keys.Truncated || keys.ValuesTruncated || keys.Rows.Count == 0)
+            throw new ArgumentException("A visible user table with an enabled primary key is required for ordered paging. Otherwise use an explicitly ordered read-only query.");
+        var order = keys.Rows.Select(row => (string)row[0]!).ToArray();
+        var result = await ExecuteAsync(TablePaging.Query(schema, name, columns, order), pageSize, command =>
+        {
+            command.Parameters.Add("@offset", SqlDbType.Int).Value = offset;
+            command.Parameters.Add("@take", SqlDbType.Int).Value = pageSize + 1;
+        }, token);
+        if (result.Truncated && result.Rows.Count == 0)
+            throw new ArgumentException("One row exceeds the response budget. Select fewer columns.");
+        return new(result, offset, result.Truncated ? checked(offset + result.Rows.Count) : null, order);
     }
 
     private async Task<SqlResult> ExecuteAsync(string sql, int maxRows, Action<SqlCommand>? configure, CancellationToken cancellationToken)
