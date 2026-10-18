@@ -48,6 +48,14 @@ public sealed class ProcedureWorkflow(IProcedureBackend backend,
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, _stopped.Token);
         return await backend.ReadAsync(schema, name, linked.Token) ?? throw new ArgumentException("Procedure not found or not visible in the selected database.");
     }
+    public async Task<TableSchemaPage> ReadTableSchemaAsync(string schema, string name, int offset, int maxCharacters,
+        string? expectedRevision, CancellationToken token)
+    {
+        ProcedureDefinitionPage.Validate(offset, maxCharacters, expectedRevision);
+        if (backend is not ITableActionBackend tables) throw new InvalidOperationException("Table schema tools unavailable.");
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, _stopped.Token);
+        return TableSchemaPage.Create(await tables.ReadSchemaAsync(schema, name, linked.Token), offset, maxCharacters, expectedRevision);
+    }
     public async Task<ProcedureRequestStatus> PrepareExecutionAsync(string schema, string name, string parametersJson, CancellationToken token)
     {
         var definition = await ReadAsync(schema, name, token);

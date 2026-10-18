@@ -1,5 +1,12 @@
 # Release notes
 
+## 0.11.0 - Large table inspection and approved changes (unreleased)
+
+- Add primary-key ordered live row paging with explicit columns and continuation offsets. Retain row/column/value response bounds and disclose concurrent-write consistency limits.
+- Add revision-checked table catalog metadata pages and remove the 128K schema-review and 20K approved table SQL caps. Full visible metadata remains in approval review, schema rechecks and private ALTER backups.
+- Retain 500 direct rows per approved write, exact scoped SQL, single-use approval and transaction/row-count checks. Row backups and automatic bulk updates are not provided.
+- Rebuild desktop and adapter, publish/refresh plugin and restart the chat app for the new tool schemas. Production tables were not modified during development.
+
 ## 0.10.0 - Large stored procedures (unreleased)
 
 - Remove the 128,000-character cap from full procedure reads and CREATE/ALTER validation. Revision checks, explicit desktop approval and private full-definition backups remain in place.

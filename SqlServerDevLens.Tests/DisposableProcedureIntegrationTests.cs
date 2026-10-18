@@ -53,6 +53,14 @@ public class DisposableProcedureIntegrationTests
             var drift = await workflow.PrepareTableAsync("dbo", "Example", "UPDATE dbo.Example SET qty=99 WHERE id>0", 2, timeout.Token); decision!(true);
             await using var db = new SqlConnection(builder.ConnectionString); await db.OpenAsync(timeout.Token);
             await Command(db, "INSERT dbo.Example(id,qty) VALUES(3,0)", timeout.Token);
+            using var readerDatabase = new SqlDatabase(new("127.0.0.1", 1433, name, AuthenticationMode.Sql,
+                builder.UserID, true, true), builder.Password);
+            var firstRows = await readerDatabase.ReadTablePageAsync("dbo", "Example", ["id", "qty"], 0, 2, timeout.Token);
+            Assert.Equal(2, firstRows.NextOffset); Assert.Equal(2, firstRows.Data.Rows.Count);
+            var finalRows = await readerDatabase.ReadTablePageAsync("dbo", "Example", ["id", "qty"], firstRows.NextOffset!.Value, 2, timeout.Token);
+            Assert.Null(finalRows.NextOffset); Assert.Single(finalRows.Data.Rows); Assert.Equal(3, finalRows.Data.Rows[0][0]);
+            await Command(db, "CREATE TABLE dbo.NoKey(id int)", timeout.Token);
+            await Assert.ThrowsAsync<ArgumentException>(() => readerDatabase.ReadTablePageAsync("dbo", "NoKey", ["id"], 0, 2, timeout.Token));
             await Assert.ThrowsAsync<InvalidOperationException>(() => workflow.ApplyTableAsync(drift.RequestId, timeout.Token));
             await using (var check = db.CreateCommand())
             { check.CommandText = "SELECT qty FROM dbo.Example WHERE id=1"; Assert.Equal(5, await check.ExecuteScalarAsync(timeout.Token)); }
@@ -60,9 +68,19 @@ public class DisposableProcedureIntegrationTests
             await Assert.ThrowsAsync<InvalidOperationException>(() => workflow.ApplyTableAsync(failing.RequestId, timeout.Token));
             await using (var check = db.CreateCommand())
             { check.CommandText = "SELECT qty FROM dbo.Example WHERE id=1"; Assert.Equal(5, await check.ExecuteScalarAsync(timeout.Token)); }
+            var largeMarker = new string('x', 160000);
+            await Command(db, "CREATE TRIGGER dbo.ExampleAudit ON dbo.Example AFTER UPDATE AS BEGIN /*" + largeMarker + "*/ SET NOCOUNT ON; END", timeout.Token);
+            var schema = await backend.ReadSchemaAsync("dbo", "Example", timeout.Token);
+            Assert.True(schema.Metadata.Length > 128000); Assert.Contains(largeMarker, schema.Metadata);
+            var firstSchema = await workflow.ReadTableSchemaAsync("dbo", "Example", 0, 32000, null, timeout.Token);
+            Assert.False(firstSchema.Complete);
+            var nextSchema = await workflow.ReadTableSchemaAsync("dbo", "Example", firstSchema.NextOffset!.Value, 32000, firstSchema.Revision, timeout.Token);
+            Assert.Equal(firstSchema.Revision, nextSchema.Revision);
             Assert.True((await Run("ALTER TABLE dbo.Example ADD extra int NULL")).SchemaBackupSaved);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => workflow.ReadTableSchemaAsync("dbo", "Example", firstSchema.NextOffset.Value, 32000, firstSchema.Revision, timeout.Token));
             var backup = await File.ReadAllTextAsync(Assert.Single(Directory.GetFiles(backupPath)), timeout.Token);
             Assert.Contains("Catalog metadata only", backup); Assert.DoesNotContain("\"name\": \"extra\"", backup);
+            Assert.Contains(largeMarker, backup);
             var stale = await workflow.PrepareTableAsync("dbo", "Example", "UPDATE dbo.Example SET qty=10 WHERE id=1", 1, timeout.Token); decision(true);
             await Command(db, "ALTER TABLE dbo.Example ADD outside_change int NULL", timeout.Token);
             await Assert.ThrowsAsync<InvalidOperationException>(() => workflow.ApplyTableAsync(stale.RequestId, timeout.Token));

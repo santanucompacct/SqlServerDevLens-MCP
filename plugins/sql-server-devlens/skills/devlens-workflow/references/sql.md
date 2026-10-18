@@ -27,6 +27,10 @@ Review all returned result sets, output parameters, return code, errors and boun
 
 ## Tables and row changes
 
+For large tables use `read_table_page(schema, name, columns, offset, pageSize)` with explicit exact columns; it requires a visible enabled primary key and orders by all key columns. Follow `nextOffset` (null ends the read), at most 500 rows per page. This is live offset paging, not a snapshot; concurrent writes may skip/repeat rows. Do not claim a consistent export. ValuesTruncated remains meaningful; long text/binary/complex values are still bounded or omitted.
+
+Use `get_table_schema` for paged columns/index/check/foreign-key/trigger metadata. Follow nextOffset with expectedRevision until complete, restarting on schema revision changes. Complete metadata is used internally for approval/rechecks and private ALTER backups without the old 128K cap. Metadata is not a row backup or a full restore script. SQL command length has no application cap for approved table actions; memory, transport and timeout limits remain. Never automatically split or apply bulk writes: each exact batch needs separate approval and at most 500 direct affected rows.
+
 Read current schema and, for updates, inspect the exact intended row selection first. Use `prepare_table_sql(schema, name, sql, maxAffectedRows)` → `get_table_request(requestId)` → `apply_table_sql(requestId)` after DevLens approval. Set a tight row limit matching user intent (supported 1–500, default 100); use an exact key/WHERE predicate for a single-row edit.
 
 Supported subset: regular CREATE TABLE, ALTER ADD/ALTER COLUMN, INSERT VALUES/default values and UPDATE with WHERE. DELETE, DROP, TRUNCATE, MERGE, unrestricted batches, joined/subquery changes and OUTPUT are unsupported. Trigger/cascade effects need attention. Row changes use a transaction and recheck row counts/schema. A private ALTER catalog backup is not a table-row backup or full restoration script.

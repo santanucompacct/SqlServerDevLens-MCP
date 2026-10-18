@@ -7,8 +7,24 @@ public sealed record TableSqlSnapshot(TableSqlPlan Plan, string? Revision, strin
 public sealed record TableSqlResult(string Status, int? AffectedRows, bool SchemaBackupSaved);
 public interface ITableActionBackend
 {
+    Task<TableSchemaDefinition> ReadSchemaAsync(string schema, string name, CancellationToken token) =>
+        throw new NotSupportedException("Update DevLens for table schema paging.");
     Task<TableSqlSnapshot> PrepareTableAsync(TableSqlPlan plan, CancellationToken token);
     Task<TableSqlResult> ApplyTableAsync(TableSqlSnapshot snapshot, CancellationToken token);
+}
+public sealed record TableSchemaDefinition(string Schema, string Name, string Metadata, string Revision);
+public sealed record TableSchemaPage(string Schema, string Name, string Metadata, string Revision, int TotalCharacters,
+    int Offset, int? NextOffset, bool Complete)
+{
+    public static TableSchemaPage Create(TableSchemaDefinition source, int offset, int maxCharacters, string? expectedRevision)
+    {
+        // Shared text paging rules include UTF-16 boundaries and mandatory continuation revisions.
+        if (expectedRevision is not null && expectedRevision != source.Revision)
+            throw new InvalidOperationException("Table schema changed. Discard previous pages and restart at offset 0.");
+        var page = ProcedureDefinitionPage.Create(new(source.Schema, source.Name, source.Metadata, source.Revision, true, true, []),
+            offset, maxCharacters, expectedRevision);
+        return new(source.Schema, source.Name, page.Definition, page.Revision, page.TotalCharacters, page.Offset, page.NextOffset, page.Complete);
+    }
 }
 
 public static class TableSql
@@ -16,8 +32,8 @@ public static class TableSql
     public static TableSqlPlan Validate(string schema, string name, string sql, int maxRows)
     {
         ProcedureSql.ValidateName(schema, name);
-        if (maxRows is < 1 or > 500 || string.IsNullOrWhiteSpace(sql) || sql.Length > 20000)
-            throw new ArgumentException("Use one SQL statement of at most 20,000 characters and maxAffectedRows from 1 to 500.");
+        if (maxRows is < 1 or > 500 || string.IsNullOrWhiteSpace(sql))
+            throw new ArgumentException("Use one complete SQL statement and maxAffectedRows from 1 to 500.");
         var parsed = new TSql170Parser(true).Parse(new StringReader(sql), out var errors) as TSqlScript;
         if (errors.Count > 0 || parsed is null || parsed.Batches.Count != 1 || parsed.Batches[0].Statements.Count != 1)
             throw new ArgumentException("Supply one valid CREATE TABLE, supported ALTER TABLE, INSERT VALUES or UPDATE statement. No GO or extra statements.");

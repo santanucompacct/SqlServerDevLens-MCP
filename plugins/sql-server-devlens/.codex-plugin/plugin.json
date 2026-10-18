@@ -1,6 +1,6 @@
 {
   "name": "sql-server-devlens",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "SQL exploration and explicitly desktop-approved procedure/table actions, transactional INSERT/UPDATE and private schema backups. Optional Postman setup and approved request actions, with a bundled DevLens SQL/Postman workflow skill.",
   "mcpServers": "./mcp.json",
   "interface": {

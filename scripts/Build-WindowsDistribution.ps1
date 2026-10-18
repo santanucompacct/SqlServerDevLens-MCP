@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$Version = '0.10.0')
+param([string]$Version = '0.11.0')
 $ErrorActionPreference = 'Stop'
 if (-not $IsWindows) { throw 'Build/test this Windows package on Windows with PowerShell 7.' }
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Version must be a numeric semantic version.' }

@@ -28,6 +28,8 @@ The desktop and plugin expose:
 | `get_database_info` | Selected database name, collation and updateability. |
 | `list_database_objects` | Up to 1000 visible tables, views, procedures and functions; does not execute them. |
 | `describe_table` | Schema/name parameters; columns, types, nullability, identity, primary keys and foreign-key targets for a table/view. Empty rows means missing or not visible. |
+| `read_table_page` | Explicit columns, primary-key order, offset/nextOffset; 1-500 rows per page. Requires a visible enabled primary key. Live reads, not a snapshot. |
+| `get_table_schema` | Full visible table catalog metadata in revision-checked text pages; not a row backup or full restore script. |
 | `query_read_only` | One SELECT, including CTEs, joins and aggregations; default 100 rows, configurable 1–500. |
 
 `query_read_only` uses Microsoft's ScriptDom parser. It rejects writes, SELECT INTO, sequences, EXEC/procedures, USE, multiple statements/batches, explicit cross-database/linked-server names, temporary objects, variables, external sources, table-valued/custom functions and hints. Common scalar/aggregate/window built-ins are allowlisted in `ReadOnlySql.cs`; other functions return a clear validation error. Unsupported SQL is rejected before connecting. The SELECT tool remains read-only. Procedure actions use the separate approval workflow below; raw EXEC and arbitrary DDL are still rejected by query_read_only.
@@ -197,3 +199,11 @@ Normal CI skips this live test and has no SQL credentials. GitHub Actions restor
 Future work: additional read-only schema details/pagination, broader carefully reviewed SQL support, macOS/Linux secure storage, installers and broader Postman auth/environment/runtime support. Procedures may write data only through the explicit approval workflow. Approved table INSERT/UPDATE and selected schema changes are supported as described above. DELETE/DROP/TRUNCATE, unrestricted writes and automatic migrations are outside this milestone.
 
 Licensed under [MIT](LICENSE.txt). Third-party tools retain their own licenses.
+
+### Large table browsing and approved changes (0.11.0)
+
+`read_table_page` returns at most 500 rows per call (default 100) in complete primary-key order. Supply exact column names, then pass the returned `nextOffset` until null. The table must have a visible enabled primary key. Concurrent inserts/deletes/key changes can cause repeats or skips; these are live pages, not a consistent export. Select fewer columns if a row exceeds the response budget. Individual text values still have the existing 2,000-character bound; binary/complex values remain omitted and `ValuesTruncated` must be respected.
+
+`get_table_schema` returns columns, indexes, checks, foreign keys and trigger metadata as paged JSON text. Use offset/maxCharacters (default 32,000, range 256-128,000) and expectedRevision exactly like procedure paging. Restart if the schema revision changes. There is no full schema character cap for approval review, revision checks or private ALTER metadata backups. These backups contain no table rows and are not complete restore scripts. The 20,000-character approved table SQL cap is also removed; parser validation, per-operation connections, explicit single-use approval and transaction/affected-row checks remain. Memory, transport and timeout limits still apply.
+
+A large table can be edited with an exact WHERE clause and up to 500 direct rows per approved action. This does not authorize a bulk update of the entire table or automatic batch retries. Each batch requires its own approval; triggers/cascades may have additional effects.
