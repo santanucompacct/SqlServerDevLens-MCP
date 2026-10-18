@@ -1,10 +1,10 @@
 [CmdletBinding()]
-param([string]$Destination = (Join-Path $env:LOCALAPPDATA 'SqlServerDevLens/Portable/v0.9.0'))
+param([string]$Destination = (Join-Path $env:LOCALAPPDATA 'SqlServerDevLens/Portable/v0.11.0'))
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$version = '0.9.0'
+$version = '0.11.0'
 $fileName = "SqlServerDevLens-$version-win-x64.zip"
-$expectedHash = '57f369e92729096ec9a091dd17ef9c1a211423a7be879920624b95c1f8aa2190'
+$expectedHash = 'e81c43795354605745cb93672f164c9a33cecb8e73b8ce8161e66d242a0f520f'
 $destinationPath = [IO.Path]::GetFullPath($Destination)
 if (Test-Path -LiteralPath $destinationPath) {
     throw "Destination already exists: $destinationPath. Existing files were not changed. Use that installation or choose a new folder with -Destination."

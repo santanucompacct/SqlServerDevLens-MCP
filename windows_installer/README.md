@@ -4,6 +4,8 @@
 
 This is a portable ZIP, not an MSI. It includes the desktop application, bundled .NET runtime, MCP adapter EXE, workflow skill, help and plugin setup files. **Visual Studio and a separate .NET installation are not needed.** ChatGPT Desktop with local-plugin access and your authorized SQL/Postman details are still required.
 
+For an existing portable or source installation, follow [Install and upgrade](../docs/INSTALL-AND-UPGRADE.md) before replacing files or changing the registered DevLens source.
+
 ## Easiest way
 
 1. Download the ZIP above and extract it completely to a permanent folder.
