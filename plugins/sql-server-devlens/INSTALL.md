@@ -64,3 +64,11 @@ Do not distribute saved profiles, Credential Manager secrets, private database/P
 Ask: **Use the DevLens workflow skill to call get_server_status and check my connection.** Expect the actual server state; `sqlConnected: false` is normal per-operation connection handling. For combined mode, also check `get_postman_selection`. These checks do not execute a procedure or application request. DevLens approvals still apply to procedure executions, changes and Postman runs.
 
 Local installation follows [official marketplace guidance](https://developers.openai.com/plugins/build/plugins#install-a-local-plugin-manually). Local stdio plugins require [desktop/local execution](https://developers.openai.com/plugins/deploy/desktop-only). Skill discovery on this development host was verified; another account/computer must verify its own installation and access.
+
+## 0.11.0 upgrade and tool verification
+
+Version 0.11.0 includes procedure definition pages plus `get_table_schema` and `read_table_page`. The current adapter advertises 25 tools. A newer desktop app can still be reached through an older adapter, so a successful status call alone does not verify the new tools.
+
+For source upgrades, pull master, rebuild the desktop, **publish the adapter into this plugin's server folder**, then rerun `codex plugin add sql-server-devlens@devlens-local`. Keep the registered source folder unchanged. For portable upgrades, use the complete 0.11.0 package and its Install-Plugin.cmd; no .NET/Visual Studio is needed. Stop DevLens before replacing executable files. Setup intentionally stops if DevLens Local points to another folder; resolve the source migration without removing unrelated marketplaces.
+
+Fully quit/reopen the chat app after refreshing the plugin. If an existing chat still has an older tool list, start a new local chat and enable DevLens there. Confirm both new tools are callable, not merely mentioned by the skill. Ask for read-only schema and two small row pages from a visible table with a primary key. No procedure execution, writes or HTTP requests are needed for installation testing. Row pages are live, and individual values may be truncated; schema/definition continuations require expectedRevision. Full installation/upgrade guide in a source checkout: docs/INSTALL-AND-UPGRADE.md; portable package: HELP.md and README-FIRST.txt.
