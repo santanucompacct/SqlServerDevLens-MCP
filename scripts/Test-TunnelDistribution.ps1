@@ -51,7 +51,9 @@ try {
     # Real clean-account profile materialization, isolated from the user's APPDATA.
     $profiles=Join-Path ([IO.Path]::GetTempPath()) ('dvl-profile-'+[guid]::NewGuid().ToString('N'))
     try {
-        & (Join-Path $root 'Tunnel/Configure-Tunnel.ps1') -Profile 'package-test' -TunnelId ('tunnel_'+('0'*32)) -ProfileDirectory $profiles
+        $windowsPowerShell=Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
+        & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'Tunnel/Configure-Tunnel.ps1') -Profile 'package-test' -TunnelId ('tunnel_'+('0'*32)) -ProfileDirectory $profiles
+        if ($LASTEXITCODE -ne 0) { throw 'Windows PowerShell 5.1 recipient profile setup failed.' }
         $config=Get-Content -Raw (Join-Path $profiles 'package-test.yaml')
         if ($config -notmatch 'env:CONTROL_PLANE_API_KEY' -or $config -notmatch '127.0.0.1:8080' -or $config -notmatch 'published_mcp') { throw 'Profile configuration not isolated or correctly wired.' }
         $existing=$false

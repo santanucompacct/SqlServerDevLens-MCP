@@ -11,10 +11,12 @@ try {
         $pointer=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
         $env:CONTROL_PLANE_API_KEY=[Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)
     }
-    if ($DoctorOnly) { & $client doctor --profile $Profile --profile-dir $ProfileDirectory }
+    if ([string]::IsNullOrWhiteSpace($env:CONTROL_PLANE_API_KEY)) { throw 'A runtime key must be supplied locally.' }
+    $safeOptions=@('--profile',$Profile,'--profile-dir',$ProfileDirectory,'--control-plane.api-key','env:CONTROL_PLANE_API_KEY','--health.listen-addr','127.0.0.1:8080','--log.http-raw-unsafe=false')
+    if ($DoctorOnly) { & $client doctor @safeOptions }
     else {
         Write-Host 'Keep DevLens Running. Loopback dashboard: http://127.0.0.1:8080/ui. Ctrl+C stops this tunnel; it does not revoke your key.'
-        & $client run --profile $Profile --profile-dir $ProfileDirectory
+        & $client run @safeOptions
     }
     if ($LASTEXITCODE -ne 0) { throw 'Tunnel command failed; inspect local output without sharing credentials or log archives.' }
 } finally {
