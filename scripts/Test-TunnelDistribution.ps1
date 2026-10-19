@@ -17,7 +17,7 @@ try {
     $root=[IO.Path]::GetFullPath($PackageRoot)
     foreach ($path in @('published_app/SqlServerDevLens.Desktop.exe','published_mcp/SqlServerDevLens.McpHost.exe',
         'published_app/coreclr.dll','published_mcp/coreclr.dll','Tunnel/tunnel-client.exe','Tunnel/cloudflared.exe',
-        'Tunnel/LICENSE','Tunnel/NOTICE','Tunnel/Configure-Tunnel.ps1','Tunnel/Start-Tunnel.ps1',
+        'Tunnel/LICENSE','Tunnel/NOTICE','Tunnel/Configure-Tunnel.ps1','Tunnel/Start-Tunnel.ps1','Tunnel/Start-All.ps1','Tunnel/launcher.example.ini','Start-All.cmd',
         'Configure-Tunnel.cmd','Start-Tunnel.cmd','Start-DevLens.cmd','TUNNEL_SETUP_AND_RELEASE.md','BUILD-INFO.json',
         'Install-Plugin.cmd','Setup-Plugin.ps1','.agents/plugins/marketplace.json','licenses/dependencies.json',
         'plugins/sql-server-devlens/skills/devlens-workflow/SKILL.md',
@@ -28,6 +28,7 @@ try {
     }
     $files=@(Get-ChildItem -LiteralPath $root -File -Recurse -Force)
     foreach ($file in $files) {
+        if ($file.Extension -eq '.ini' -and $file.Name -ne 'launcher.example.ini') { throw 'User INI must never be distributed.' }
         if ($file.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Links are forbidden in release files.' }
         if ($file.Name -match '(?i)^(connections|credentials|devlens-tunnel)\.(json|ini)$|^\.env|\.(pem|key|pfx|p12|sql|xlsx|csv|pdb)$' -or
             $file.FullName -match '(?i)[/\\](ProcedureBackups|TableSchemaBackups|PostmanBackups|profiles|state)[/\\]') { throw 'Forbidden private/generated file in package.' }

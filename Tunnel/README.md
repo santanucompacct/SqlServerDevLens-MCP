@@ -14,6 +14,14 @@ Full architecture, verification, troubleshooting, upgrade and release gates: **T
 
 ## Roles and shutdown
 
+## One-click startup with a local INI
+
+Run **Start-All.cmd**. On the first run it opens `Tunnel/launcher.ini` in Notepad. Enter your own `TunnelId` and `ApiKey`, save, close Notepad and run Start-All.cmd again. It starts DevLens (or uses an already running instance), starts the tunnel, and opens `http://127.0.0.1:8080/ui` once readiness succeeds. Complete SQL/Postman setup inside DevLens until Running. The launcher does not automate database login or approvals.
+
+For later starts, use Start-All.cmd only. Keep the app and tunnel terminal open. Stop the old tunnel before launching; an occupied dashboard port causes a clear error. To change the tunnel ID or key, stop the tunnel, edit the INI and start again. No credential-management commands are required. Changes to the tunnel ID or extraction path create a separate generated profile without overwriting the existing `devlens` profile.
+
+The INI deliberately stores the key in plaintext for this development workflow. Anyone able to read it can use the key. Keep it local and private. The source repository ignores completed INIs; release packaging includes only the blank example and rejects completed INIs. The key goes to the tunnel through its process environment, never a literal command-line argument. The existing separate setup/start commands remain available.
+
 - `published_app/`: fresh self-contained Desktop; owns credentials, approvals and the local MCP runtime.
 - `published_mcp/`: fresh self-contained stdio adapter launched by tunnel-client with `--desktop`.
 - `Tunnel/`: pinned client 0.0.16 and upstream companion/license/SPDX files, plus safe setup/start scripts. Cloudflared is bundled upstream but unused in the verified outbound-polling setup.

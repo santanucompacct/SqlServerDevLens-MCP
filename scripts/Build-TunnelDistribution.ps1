@@ -5,6 +5,7 @@ if (-not $IsWindows -or $Revision -lt 1 -or $Version -notmatch '^\d+\.\d+\.\d+$'
 $tag="tunnel-$Version-$Revision"
 if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne $tag) { throw 'Tunnel tag/version mismatch.' }
 $repo=Split-Path $PSScriptRoot -Parent
+& (Join-Path $PSScriptRoot 'Test-TunnelLauncher.ps1')
 $lock=Get-Content -Raw (Join-Path $repo 'Tunnel/tunnel-client-lock.json') | ConvertFrom-Json
 $output=Join-Path $repo ('Tunnel/packages/build-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $output -Force | Out-Null
@@ -37,10 +38,11 @@ Copy-Item -LiteralPath (Join-Path $base 'desktop') -Destination (Join-Path $pack
 Copy-Item -LiteralPath (Join-Path $base 'plugins/sql-server-devlens/server') -Destination (Join-Path $package 'published_mcp') -Recurse
 $tunnel=Join-Path $package 'Tunnel'; New-Item -ItemType Directory -Path $tunnel | Out-Null
 foreach ($entry in $lock.files.PSObject.Properties) { Copy-Item -LiteralPath (Join-Path $vendor $entry.Name) -Destination $tunnel }
-foreach ($item in @('tunnel-client-lock.json','Configure-Tunnel.ps1','Start-Tunnel.ps1','README.md')) {
+foreach ($item in @('tunnel-client-lock.json','Configure-Tunnel.ps1','Start-Tunnel.ps1','Start-All.ps1','launcher.example.ini','README.md')) {
     Copy-Item -LiteralPath (Join-Path $repo "Tunnel/$item") -Destination $tunnel
 }
 Copy-Item -LiteralPath (Join-Path $repo 'docs/TUNNEL_SETUP_AND_RELEASE.md') -Destination $package
+'@echo off', 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0Tunnel\Start-All.ps1"', 'if errorlevel 1 pause' | Set-Content -Encoding ascii (Join-Path $package 'Start-All.cmd')
 '@echo off', 'start "" "%~dp0published_app\SqlServerDevLens.Desktop.exe"' | Set-Content -Encoding ascii (Join-Path $package 'Start-DevLens.cmd')
 foreach ($action in @('Configure','Start')) {
     '@echo off', "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"%~dp0Tunnel\$action-Tunnel.ps1`"", 'pause' |

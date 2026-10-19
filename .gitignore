@@ -397,6 +397,7 @@ published_mcp/
 published_applictaion/
 Tunnel/*.exe
 Tunnel/*.ini
+!Tunnel/launcher.example.ini
 Tunnel/*.yaml
 Tunnel/*.yml
 Tunnel/*.pem
