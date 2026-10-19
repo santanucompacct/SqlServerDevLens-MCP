@@ -13,7 +13,23 @@ New-Item -ItemType Directory -Path $ProfileDirectory -Force | Out-Null
 # Windows accepts forward slashes; preserve spaces with quotes around this normalized path.
 $commandPath=$hostExe.Replace('\','/')
 # No key is needed to materialize an environment-reference profile. init does not authorize the account.
-& $client init --sample sample_mcp_stdio_local --profile $Profile --profile-dir $ProfileDirectory --tunnel-id $TunnelId `
-    --control-plane-api-key-ref 'env:CONTROL_PLANE_API_KEY' --health-listen-addr '127.0.0.1:8080' --mcp-command ('"'+$commandPath+'" --desktop')
-if ($LASTEXITCODE -ne 0) { throw 'Profile creation failed; review local CLI output.' }
+# Windows PowerShell 5.1 native argument passing removes embedded quotes. Build the
+# Windows command line explicitly so the nested MCP command retains spaces/quotes.
+function Quote-NativeArgument([string]$Value) {
+    '"'+[regex]::Replace([regex]::Replace($Value,'(\\*)"','$1$1\"'),'(\\+)$','$1$1')+'"'
+}
+$arguments=@('init','--sample','sample_mcp_stdio_local','--profile',$Profile,'--profile-dir',$ProfileDirectory,
+    '--tunnel-id',$TunnelId,'--control-plane-api-key-ref','env:CONTROL_PLANE_API_KEY',
+    '--health-listen-addr','127.0.0.1:8080','--mcp-command',('"'+$commandPath+'" --desktop'))
+$info=New-Object Diagnostics.ProcessStartInfo
+$info.FileName=$client; $info.Arguments=($arguments | ForEach-Object { Quote-NativeArgument $_ }) -join ' '
+$info.UseShellExecute=$false; $info.CreateNoWindow=$true
+$info.RedirectStandardOutput=$true; $info.RedirectStandardError=$true
+$process=[Diagnostics.Process]::Start($info)
+try {
+    $output=$process.StandardOutput.ReadToEndAsync(); $errors=$process.StandardError.ReadToEndAsync()
+    if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'Profile creation timed out.' }
+    if ($process.ExitCode -ne 0) { throw ('Profile creation failed: '+$errors.Result) }
+    Write-Host $output.Result
+} finally { $process.Dispose() }
 Write-Host 'Profile created with a key reference only. Start DevLens and finish SQL/Postman setup, then run Start-Tunnel.cmd.'
