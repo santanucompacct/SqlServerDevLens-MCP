@@ -1,5 +1,7 @@
 # SQL Server DevLens MCP
 
+Tunnel deployment work is maintained separately on `Tunnel_Installation`. See [verified tunnel setup and release guidance](docs/TUNNEL_SETUP_AND_RELEASE.md) and [Windows tunnel installation](Tunnel/README.md). Standard `master`/`v*` releases remain unchanged. Tunnel branch artifacts are test packages until explicitly approved for a `tunnel-*` prerelease; recipients must create their own private tunnel identity.
+
 **Your SQL Server, understood by AI.** MIT-licensed .NET 10 / Avalonia desktop application with owl branding.
 
 ## Version 0.11.0: large SQL procedures/tables and Windows portable distribution
