@@ -1,5 +1,7 @@
 # Run DevLens without Visual Studio
 
+**Want the one-click tunnel connection for ChatGPT?** Follow the [illustrated tunnel / API key / ChatGPT setup guide](../Tunnel/QUICKSTART.md). It uses a separate tunnel package with Start-All.cmd; the standard local-plugin ZIP below does not contain the tunnel launcher. Check its documented download-security status before sharing a candidate.
+
 Download **[SqlServerDevLens-0.11.0-win-x64.zip](https://github.com/santanucompacct/SqlServerDevLens-MCP/releases/download/v0.11.0/SqlServerDevLens-0.11.0-win-x64.zip)** and **SHA256SUMS.txt** from [release v0.11.0](https://github.com/santanucompacct/SqlServerDevLens-MCP/releases/tag/v0.11.0). The release publishes after package checks succeed. Compiled files are release assets rather than large binaries in Git; this folder contains setup files and reproducible build instructions.
 
 The ZIP includes the self-contained desktop app and MCP adapter, plugin manifests, SQL/Postman workflow skill, marketplace, setup/launch scripts, help and dependency notices. Both programs bundle .NET. This first distribution targets **Windows x64**; ChatGPT Desktop/local-plugin access is a separate prerequisite.

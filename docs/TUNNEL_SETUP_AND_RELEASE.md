@@ -1,6 +1,8 @@
 # Tunnel setup, verification and separate release
 
-Verification date: **19 October 2026**. Branch: `Tunnel_Installation`; standard `master`, its v0.11.0 release and existing release workflow are preserved. This document records inspected facts and explicitly distinguishes offline package tests from account-dependent remote validation.
+Verification date: **19 October 2026**. Tunnel source is being integrated into `master` at the owner's request; `Tunnel_Installation` remains supported by the dedicated workflow. Standard v0.11.0 assets and the existing standard release workflow are preserved.
+
+**Recipient guide:** [Illustrated tunnel, key, INI and ChatGPT connection setup](../Tunnel/QUICKSTART.md). [Exact candidate security checks and unresolved Chrome warning](../Tunnel/DOWNLOAD-VALIDATION.md). This document records inspected facts and explicitly distinguishes offline package tests from account-dependent remote validation.
 
 ## Verified new installation
 
@@ -39,11 +41,13 @@ ChatGPT remote connector (authorized user/workspace)
 
 - Historical local-only deployment: ChatGPT desktop local plugin launches a stdio adapter. New remote deployment: the OpenAI client launches that same adapter through a private outbound tunnel. The cloudflared manifest alone never established which path was used.
 - The legacy launcher auto-opened the browser after readiness and read a real API key from an INI beside the binaries. The inspected INI had inherited broad local-user permissions. Do not distribute it. Its owner should restrict/remove that file and rotate a key if exposure is suspected; the live file was not modified by this task.
-- New distributable scripts prompt locally or accept an environment key, preserve existing profiles, bind the management UI to loopback and never embed an identity. They intentionally do not auto-launch the dashboard watcher or silently start another Desktop instance. Open `/ui` manually after readiness.
+- The manual launch scripts prompt locally or accept an environment key. The owner-requested Start-All launcher instead reads a private plaintext INI, starts/reuses Desktop, starts a generated profile and opens the dashboard after readiness. Both paths preserve existing profiles, bind the management UI to loopback and never bundle an identity. Successful polling must be checked separately from readiness.
 - Both existing `published_app/` and `published_mcp/` were framework-dependent net10.0 publishes, missing coreclr.dll. They require an installed .NET runtime and cannot serve as the no-Visual-Studio/no-runtime package. The new builder publishes fresh self-contained win-x64 outputs instead.
 - The developer checkout was on a feature branch with 130 local deleted tracked publish-output files. It was left untouched. Work uses an isolated clean checkout based on `Tunnel_Installation`; no reset/clean/force-push is needed.
 
 ## New Windows user without Visual Studio
+
+Use the [illustrated quickstart](../Tunnel/QUICKSTART.md) for the recommended one-click INI workflow. The steps below describe the still-supported manual launch alternative.
 
 Follow the package's **README-FIRST.md** (source: `Tunnel/README.md`). Download ZIP and SHA256SUMS only from an explicitly approved `tunnel-*` release, verify and extract the entire archive. Do not run inside the ZIP. The package includes .NET; ChatGPT/OpenAI accounts, SQL permissions, internet access and Windows policy are separate prerequisites.
 
@@ -89,7 +93,7 @@ The plugin keeps an identical adapter copy inside `plugins/.../server/` for the 
 
 `scripts/Test-TunnelDistribution.ps1 -PackageDirectory <artifact-folder>` verifies a fresh extraction with spaces, runtime inventory, matching adapter copies, contained plugin command, vendor hashes, private-file/identity scanning, stdio protocol and isolated profile setup. It does not authenticate or poll a real recipient tunnel. Scanning cannot prove absence of all secrets; source/config review is also required.
 
-`.github/workflows/tunnel-distribution.yml` handles PRs targeting/pushes to Tunnel_Installation and manual builds as **Actions artifacts only**. An intentional `tunnel-0.11.0-1` tag enables a separate contents-write release job after package tests. Configure the `tunnel-release` environment with required reviewers before using it. Releases are prereleases with `make_latest: false`; standard master/v* automation is unchanged. Future versions must update the explicit script defaults/tag validation deliberately.
+`.github/workflows/tunnel-distribution.yml` handles PRs targeting/pushes to master or Tunnel_Installation and manual builds as **Actions artifacts only**. An intentional `tunnel-0.11.0-1` tag enables a separate contents-write release job after package tests. Configure the `tunnel-release` environment with required reviewers before using it. Releases are prereleases with `make_latest: false`; standard master/v* automation is unchanged. Future versions must update the explicit script defaults/tag validation deliberately.
 
 **Initial public upload remains gated:** review the exact artifact inventory/hash, recipient identity isolation, license/provenance and remaining acceptance items, then obtain explicit owner approval before creating the first tunnel tag. No tag/release is implied merely by a green artifact build.
 
@@ -102,11 +106,15 @@ The plugin keeps an identical adapter copy inside `plugins/.../server/` for the 
 
 ### Implementation and local test record
 
-Reviewed implementation: [PR #10](https://github.com/santanucompacct/SqlServerDevLens-MCP/pull/10), targeting Tunnel_Installation only. Local .NET regression run: 139 passed, five environment-gated tests skipped. Fresh staging and extracted package checks passed for bundled runtimes/vendor hashes, private-file/path scan, headless MCP status, desktop-mode 25-tool discovery using an isolated nonexistent pipe, and recipient profile creation under Windows PowerShell 5.1. An extraction path containing spaces and rejection of an existing profile were exercised. Tests found and fixed both Windows backslash parsing and PowerShell 5.1 nested-quote loss; the generated MCP command uses a quoted normalized forward-slash path.
+Reviewed implementation: [PR #10](https://github.com/santanucompacct/SqlServerDevLens-MCP/pull/10), initially targeting Tunnel_Installation, now retargeted to master at the owner's request. Local .NET regression run: 139 passed, five environment-gated tests skipped. Fresh staging and extracted package checks passed for bundled runtimes/vendor hashes, private-file/path scan, headless MCP status, desktop-mode 25-tool discovery using an isolated nonexistent pipe, and recipient profile creation under Windows PowerShell 5.1. An extraction path containing spaces and rejection of an existing profile were exercised. Tests found and fixed both Windows backslash parsing and PowerShell 5.1 nested-quote loss; the generated MCP command uses a quoted normalized forward-slash path.
 
 The recipient launcher enforces an environment-reference key, loopback health address and raw HTTP logging off. Exact Actions results/artifacts are available from the PR checks and the [dedicated workflow](https://github.com/santanucompacct/SqlServerDevLens-MCP/actions/workflows/tunnel-distribution.yml). An Actions artifact is not a public-release approval or evidence of a second recipient's authenticated setup. The actual scope of the current user's runtime key, key revocation, and environment required-reviewer configuration were NOT independently verified; account owners must check them before public release.
-# Single launcher (local development convenience)
+## Single launcher (local development convenience)
 
-The next package adds `Start-All.cmd`: on first launch it creates and opens `Tunnel/launcher.ini`. Fill `TunnelId` and `ApiKey` locally, save, then launch again. Subsequent launches start the desktop app, run the tunnel and open the loopback dashboard after readiness. Complete SQL/Postman connection setup in the desktop UI. Existing desktop instances are reused; stop any previous tunnel first.
+The tunnel package includes `Start-All.cmd`: on first launch it creates and opens `Tunnel/launcher.ini`. Fill `TunnelId` and `ApiKey` locally, save, then launch again. Subsequent launches start the desktop app, run the tunnel and open the loopback dashboard after readiness. Complete SQL/Postman connection setup in the desktop UI. Existing desktop instances are reused; stop any previous tunnel first.
 
 Edit this INI while the tunnel is stopped to change identity/key. Generated profiles are isolated by package path and tunnel ID, preserving existing profiles. The key is plaintext by explicit development-workflow choice, so restrict access and never share the completed INI. Only a blank `launcher.example.ini` is packaged; completed INIs are excluded and rejected by package validation. Existing manual launch commands remain supported. This addition does not change the already downloaded artifact.
+
+### One-click live verification and distribution boundary
+
+On 19 October 2026 the owner started the candidate through Start-All.cmd. An incorrect local key initially yielded healthy/ready loopback responses but no successful control-plane poll. After the owner corrected it and restarted, remote get_server_status, get_database_info and get_postman_selection succeeded. This establishes this operator's connection, not a new recipient's account permissions. Chrome's download classification remains unresolved despite clean Defender scans of the exact candidate. Source integration does not waive this release boundary; no tunnel release/tag is created by the merge. The quickstart uses labelled illustrations rather than publishing private account screenshots.

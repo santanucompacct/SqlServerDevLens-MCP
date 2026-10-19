@@ -18,6 +18,7 @@ try {
     foreach ($path in @('published_app/SqlServerDevLens.Desktop.exe','published_mcp/SqlServerDevLens.McpHost.exe',
         'published_app/coreclr.dll','published_mcp/coreclr.dll','Tunnel/tunnel-client.exe','Tunnel/cloudflared.exe',
         'Tunnel/LICENSE','Tunnel/NOTICE','Tunnel/Configure-Tunnel.ps1','Tunnel/Start-Tunnel.ps1','Tunnel/Start-All.ps1','Tunnel/launcher.example.ini','Start-All.cmd',
+        'Tunnel/QUICKSTART.md','Tunnel/DOWNLOAD-VALIDATION.md','Tunnel/images/tunnel-setup.png','Tunnel/images/tunnel-running.png',
         'Configure-Tunnel.cmd','Start-Tunnel.cmd','Start-DevLens.cmd','TUNNEL_SETUP_AND_RELEASE.md','BUILD-INFO.json',
         'Install-Plugin.cmd','Setup-Plugin.ps1','.agents/plugins/marketplace.json','licenses/dependencies.json',
         'plugins/sql-server-devlens/skills/devlens-workflow/SKILL.md',
@@ -27,6 +28,18 @@ try {
         if (-not(Test-Path -LiteralPath (Join-Path $root $path) -PathType Leaf)) { throw "Missing package component: $path" }
     }
     $files=@(Get-ChildItem -LiteralPath $root -File -Recurse -Force)
+    # The same guide ships offline: verify its images and relative links after packaging.
+    foreach ($document in @('README-FIRST.md','Tunnel/README.md','Tunnel/QUICKSTART.md','Tunnel/DOWNLOAD-VALIDATION.md','TUNNEL_SETUP_AND_RELEASE.md')) {
+        $documentPath=Join-Path $root $document
+        foreach ($link in [regex]::Matches([IO.File]::ReadAllText($documentPath),'!?\[[^\]]*\]\(([^)]+)\)')) {
+            $target=$link.Groups[1].Value.Split('#')[0]
+            if (-not $target -or $target -match '^https?://') { continue }
+            $resolved=[IO.Path]::GetFullPath((Join-Path (Split-Path $documentPath) $target))
+            if (-not $resolved.StartsWith($root+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or -not(Test-Path -LiteralPath $resolved)) {
+                throw "Broken or escaping packaged guide link in $document"
+            }
+        }
+    }
     foreach ($file in $files) {
         if ($file.Extension -eq '.ini' -and $file.Name -ne 'launcher.example.ini') { throw 'User INI must never be distributed.' }
         if ($file.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Links are forbidden in release files.' }

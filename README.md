@@ -1,6 +1,6 @@
 # SQL Server DevLens MCP
 
-Tunnel deployment work is maintained separately on `Tunnel_Installation`. See [verified tunnel setup and release guidance](docs/TUNNEL_SETUP_AND_RELEASE.md) and [Windows tunnel installation](Tunnel/README.md). Standard `master`/`v*` releases remain unchanged. Tunnel branch artifacts are test packages until explicitly approved for a `tunnel-*` prerelease; recipients must create their own private tunnel identity.
+**Tunnel / ChatGPT Web setup:** [Illustrated guide: tunnel, API key, INI, one-click startup and ChatGPT custom MCP](Tunnel/QUICKSTART.md). The tunnel implementation is included on `master`; [dedicated tunnel workflow builds](https://github.com/santanucompacct/SqlServerDevLens-MCP/actions/workflows/tunnel-distribution.yml) remain separate from the standard v0.11.0 local-plugin download. [Download security status](Tunnel/DOWNLOAD-VALIDATION.md) and [maintainer verification](docs/TUNNEL_SETUP_AND_RELEASE.md).
 
 **Your SQL Server, understood by AI.** MIT-licensed .NET 10 / Avalonia desktop application with owl branding.
 

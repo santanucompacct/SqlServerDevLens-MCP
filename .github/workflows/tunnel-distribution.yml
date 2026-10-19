@@ -1,10 +1,10 @@
 name: Tunnel Windows distribution
 on:
   push:
-    branches: [Tunnel_Installation]
+    branches: [master, Tunnel_Installation]
     tags: ['tunnel-*']
   pull_request:
-    branches: [Tunnel_Installation]
+    branches: [master, Tunnel_Installation]
   workflow_dispatch:
 permissions:
   contents: read

@@ -38,10 +38,13 @@ Copy-Item -LiteralPath (Join-Path $base 'desktop') -Destination (Join-Path $pack
 Copy-Item -LiteralPath (Join-Path $base 'plugins/sql-server-devlens/server') -Destination (Join-Path $package 'published_mcp') -Recurse
 $tunnel=Join-Path $package 'Tunnel'; New-Item -ItemType Directory -Path $tunnel | Out-Null
 foreach ($entry in $lock.files.PSObject.Properties) { Copy-Item -LiteralPath (Join-Path $vendor $entry.Name) -Destination $tunnel }
-foreach ($item in @('tunnel-client-lock.json','Configure-Tunnel.ps1','Start-Tunnel.ps1','Start-All.ps1','launcher.example.ini','README.md')) {
+foreach ($item in @('tunnel-client-lock.json','Configure-Tunnel.ps1','Start-Tunnel.ps1','Start-All.ps1','launcher.example.ini','README.md','QUICKSTART.md','DOWNLOAD-VALIDATION.md')) {
     Copy-Item -LiteralPath (Join-Path $repo "Tunnel/$item") -Destination $tunnel
 }
+Copy-Item -LiteralPath (Join-Path $repo 'Tunnel/images') -Destination (Join-Path $tunnel 'images') -Recurse
 Copy-Item -LiteralPath (Join-Path $repo 'docs/TUNNEL_SETUP_AND_RELEASE.md') -Destination $package
+$record=Join-Path $package 'TUNNEL_SETUP_AND_RELEASE.md'
+[IO.File]::WriteAllText($record,[IO.File]::ReadAllText($record).Replace('(../Tunnel/','(Tunnel/'))
 '@echo off', 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0Tunnel\Start-All.ps1"', 'if errorlevel 1 pause' | Set-Content -Encoding ascii (Join-Path $package 'Start-All.cmd')
 '@echo off', 'start "" "%~dp0published_app\SqlServerDevLens.Desktop.exe"' | Set-Content -Encoding ascii (Join-Path $package 'Start-DevLens.cmd')
 foreach ($action in @('Configure','Start')) {
@@ -52,6 +55,12 @@ foreach ($action in @('Configure','Start')) {
     tunnelArchiveSha256=$lock.archiveSha256;identityIncluded=$false;validation='Offline package validation; recipient account setup required'} |
     ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $package 'BUILD-INFO.json')
 Copy-Item -LiteralPath (Join-Path $repo 'Tunnel/README.md') -Destination (Join-Path $package 'README-FIRST.md')
+$firstReadme=Join-Path $package 'README-FIRST.md'
+$readmeText=[IO.File]::ReadAllText($firstReadme).Replace('(QUICKSTART.md)','(Tunnel/QUICKSTART.md)').Replace('(DOWNLOAD-VALIDATION.md)','(Tunnel/DOWNLOAD-VALIDATION.md)')
+[IO.File]::WriteAllText($firstReadme,$readmeText)
+# The package keeps this maintainer record at its root; preserve the guide link after copying.
+$quickstart=Join-Path $tunnel 'QUICKSTART.md'
+[IO.File]::WriteAllText($quickstart,[IO.File]::ReadAllText($quickstart).Replace('(../docs/TUNNEL_SETUP_AND_RELEASE.md)','(../TUNNEL_SETUP_AND_RELEASE.md)'))
 # Debug symbols can disclose local source paths; remove only files inside this fresh staging root.
 Get-ChildItem -LiteralPath $package -File -Recurse -Filter '*.pdb' | ForEach-Object {
     if (-not $_.FullName.StartsWith($package+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe symbol removal target.' }
