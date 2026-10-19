@@ -1,5 +1,7 @@
 # Connect SQL Server DevLens to ChatGPT Desktop
 
+**Want the one-click tunnel connection for ChatGPT?** Follow the [illustrated tunnel / API key / ChatGPT setup guide](../Tunnel/QUICKSTART.md). It uses a separate tunnel package with Start-All.cmd; the standard local-plugin ZIP below does not contain the tunnel launcher. Check its documented download-security status before sharing a candidate.
+
 This guide covers first-time local-plugin installation and starting SQL or SQL + Postman work in an existing chat. Checked against official OpenAI documentation on 17 October 2026.
 
 For first installation or an existing source/portable upgrade, follow [Install and upgrade](https://github.com/santanucompacct/SqlServerDevLens-MCP/blob/master/docs/INSTALL-AND-UPGRADE.md). A build alone does not refresh the installed adapter/tool catalog.

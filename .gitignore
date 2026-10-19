@@ -390,3 +390,19 @@ plugins/*/server/
 **/TableSchemaBackups/
 **/PostmanBackups/
 distribution/packages/
+
+# Tunnel deployment outputs and user-owned identities
+published_app/
+published_mcp/
+published_applictaion/
+Tunnel/*.exe
+Tunnel/*.ini
+!Tunnel/launcher.example.ini
+Tunnel/*.yaml
+Tunnel/*.yml
+Tunnel/*.pem
+Tunnel/*.key
+Tunnel/*.log
+Tunnel/profiles/
+Tunnel/state/
+Tunnel/packages/

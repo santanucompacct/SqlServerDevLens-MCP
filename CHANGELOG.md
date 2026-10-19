@@ -1,5 +1,14 @@
 # Release notes
 
+## Unreleased - Secure MCP Tunnel and one-click setup (2026-10-19)
+
+- Include the tunnel implementation on master, with a separate Windows packaging workflow. Standard v* release automation and the existing v0.11.0 local-plugin download remain unchanged. No new tunnel release is implied by a source merge.
+- Add Start-All.cmd and a private local TunnelId/ApiKey INI, automatic adapter/profile startup and loopback dashboard opening. Existing profiles are preserved; credentials are never bundled. The owner explicitly selected plaintext INI storage for this development workflow.
+- Add an illustrated recipient guide for Platform tunnel creation, restricted runtime key, ChatGPT custom MCP setup, verification prompts, daily use and troubleshooting. Include it and its images inside tunnel packages.
+- One-click startup followed by live remote status/SQL metadata/Postman selection succeeded after correcting the local key. No production writes or Postman application requests were run. A separate recipient account has not been tested.
+- Record the unresolved Chrome download block and clean Defender results for the exact prior candidate. These scans do not establish Google clearance or cover future builds.
+
+
 ## 0.11.0 - Large SQL support and refreshed Windows distribution (2026-10-18)
 
 - Consolidates the portable launch fix, large stored procedures and large-table inspection on master. Publishes a complete Windows x64 self-contained ZIP with the corrected contained ./ adapter command, 25 tools and bundled workflow skill.

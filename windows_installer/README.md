@@ -1,5 +1,7 @@
 # Windows installer / portable setup
 
+**Want the one-click tunnel connection for ChatGPT?** Follow the [illustrated tunnel / API key / ChatGPT setup guide](../Tunnel/QUICKSTART.md). It uses a separate tunnel package with Start-All.cmd; the standard local-plugin ZIP below does not contain the tunnel launcher. Check its documented download-security status before sharing a candidate.
+
 **[Download the complete Windows x64 setup ZIP](https://github.com/santanucompacct/SqlServerDevLens-MCP/releases/download/v0.11.0/SqlServerDevLens-0.11.0-win-x64.zip)** · [Release and checksum](https://github.com/santanucompacct/SqlServerDevLens-MCP/releases/tag/v0.11.0)
 
 This is a portable ZIP, not an MSI. It includes the desktop application, bundled .NET runtime, MCP adapter EXE, workflow skill, help and plugin setup files. **Visual Studio and a separate .NET installation are not needed.** ChatGPT Desktop with local-plugin access and your authorized SQL/Postman details are still required.
