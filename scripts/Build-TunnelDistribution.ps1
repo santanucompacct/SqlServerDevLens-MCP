@@ -8,7 +8,8 @@ $repo=Split-Path $PSScriptRoot -Parent
 $lock=Get-Content -Raw (Join-Path $repo 'Tunnel/tunnel-client-lock.json') | ConvertFrom-Json
 $output=Join-Path $repo ('Tunnel/packages/build-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $output -Force | Out-Null
-$archive=Join-Path $output 'upstream.zip'
+$inputs=Join-Path $output 'inputs'; New-Item -ItemType Directory -Path $inputs | Out-Null
+$archive=Join-Path $inputs 'upstream.zip'
 Invoke-WebRequest -Uri $lock.archiveUrl -OutFile $archive
 if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $lock.archiveSha256) { throw 'Untrusted tunnel archive.' }
 $vendor=Join-Path $output 'verified-upstream'

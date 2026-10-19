@@ -6,6 +6,7 @@ try {
     if ($PackageDirectory) {
         $zip=@(Get-ChildItem -LiteralPath $PackageDirectory -Filter 'SqlServerDevLens-Tunnel-*.zip')
         if ($zip.Count -ne 1) { throw 'Expected one tunnel archive.' }
+        if (@(Get-ChildItem -LiteralPath $PackageDirectory -Filter '*.zip').Count -ne 1) { throw 'Unexpected ZIP alongside release assets.' }
         $expected=(Get-Content -LiteralPath (Join-Path $PackageDirectory 'SHA256SUMS.txt')).Split(' ')[0]
         if ((Get-FileHash $zip[0].FullName).Hash.ToLowerInvariant() -ne $expected) { throw 'Archive checksum mismatch.' }
         $temporary=Join-Path ([IO.Path]::GetTempPath()) ('dvl-tunnel-'+[guid]::NewGuid().ToString('N')+' test')
