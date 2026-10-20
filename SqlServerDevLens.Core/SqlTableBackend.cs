@@ -37,7 +37,7 @@ public sealed partial class SqlProcedureBackend
         if (plan.Action == "table_create" && schema is not null) throw new ArgumentException("Table already exists. CREATE will not replace it.");
         if (plan.Action != "table_create" && schema is null) throw new ArgumentException("A visible user table and VIEW DEFINITION permission are required. Views/synonyms are not supported targets.");
         var matches = await MatchingRows(connection, null, plan, ct);
-        if (matches > plan.MaxRows) throw new ArgumentException("UPDATE matches more than maxAffectedRows. Narrow the WHERE clause.");
+        if (matches > plan.MaxRows) throw new ArgumentException("Action matches more than maxAffectedRows. Narrow the WHERE clause.");
         return new TableSqlSnapshot(plan, schema?.Revision, schema?.Metadata ?? "Table does not exist.", matches);
     }, token);
 
@@ -67,7 +67,7 @@ public sealed partial class SqlProcedureBackend
                 var backup = plan.Action == "table_alter";
                 if (backup) await _tableBackups.SaveAsync(current!.Metadata, ct);
                 await using var command = connection.CreateCommand(); command.Transaction = transaction; command.CommandTimeout = 15;
-                var dml = plan.Action is "table_insert" or "table_update";
+                var dml = plan.Action is "table_insert" or "table_update" or "table_delete";
                 command.CommandText = plan.Sql + (dml ? "\n; SET @__devlens_affected = @@ROWCOUNT;" : "");
                 SqlParameter? rows = null;
                 if (dml) { rows = command.Parameters.Add("@__devlens_affected", SqlDbType.Int); rows.Direction = ParameterDirection.Output; }
@@ -91,7 +91,7 @@ public sealed partial class SqlProcedureBackend
     private static async Task<int> MatchingRows(SqlConnection connection, SqlTransaction? transaction, TableSqlPlan plan, CancellationToken token)
     {
         if (plan.Action == "table_insert") return plan.InsertRows;
-        if (plan.Action != "table_update") return 0;
+        if (plan.Action is not ("table_update" or "table_delete")) return 0;
         await using var command = connection.CreateCommand(); command.Transaction = transaction; command.CommandTimeout = 15;
         command.CommandText = $"SELECT COUNT(*) FROM (SELECT TOP(@limit) 1 AS n FROM {ProcedureSql.QuotedName(plan.Schema, plan.Name)} WHERE {plan.Predicate}) AS matches;";
         command.Parameters.Add("@limit", SqlDbType.Int).Value = plan.MaxRows + 1;

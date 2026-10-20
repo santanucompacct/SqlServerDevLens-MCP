@@ -1,5 +1,8 @@
 # DevLens: tunnel, API key and ChatGPT setup
 
+**Latest tested update: 0.12.0.** [Tunnel package with Start-All.cmd](https://github.com/santanucompacct/SqlServerDevLens-MCP/actions/runs/39365983048/artifacts/12239920410) · [standard desktop/local-plugin package](https://github.com/santanucompacct/SqlServerDevLens-MCP/actions/runs/39365983226/artifacts/12239755561). These temporary Actions downloads require GitHub sign-in; extract both ZIP layers and check SHA256SUMS.txt. [Upgrade, large-result paging and session authorization](https://github.com/santanucompacct/SqlServerDevLens-MCP/blob/master/docs/RESULTS-AND-AUTHORIZATION.md). Any v0.11.0 Release/downloader links below are the older published version.
+
+
 Windows x64 portable setup, checked on 19 October 2026. No Visual Studio or separate .NET installation is needed. This guide is for the **tunnel package with Start-All.cmd**; the standard v0.11.0 local-plugin ZIP does not include that launcher.
 
 ## What you will set up

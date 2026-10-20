@@ -52,6 +52,17 @@ public class ConfirmationTests
         Assert.Equal(approve, await decision); owner.Close();
     });
 
+    [Fact]
+    public Task DesktopCheckboxesResetOnStop() => RunOnUi(async () =>
+    {
+        await using var server = new DesktopMcpServer("dva-" + Guid.NewGuid().ToString("N"));
+        var model = new ServerViewModel(server) { AutoProcedureExecution = true, AutoDelete = true, AutoPostmanRun = true };
+        Assert.True(model.Authorization.Snapshot()["table_delete"]);
+        await model.StopAsync();
+        Assert.False(model.AutoProcedureExecution); Assert.False(model.AutoDelete); Assert.False(model.AutoPostmanRun);
+        Assert.All(model.Authorization.Snapshot().Values, v => Assert.False(v));
+    });
+
     private static async Task RunOnUi(Func<Task> action)
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(HeadlessAppBuilder));

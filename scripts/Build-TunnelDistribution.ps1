@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$Version='0.11.0', [int]$Revision=1)
+param([string]$Version='0.12.0', [int]$Revision=1)
 $ErrorActionPreference='Stop'
 if (-not $IsWindows -or $Revision -lt 1 -or $Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Use Windows PowerShell 7, a semantic version and positive revision.' }
 $tag="tunnel-$Version-$Revision"
@@ -31,7 +31,7 @@ if (-not(Test-Path -LiteralPath (Join-Path $base 'desktop/SqlServerDevLens.Deskt
 $name="SqlServerDevLens-Tunnel-$Version-$Revision-win-x64"
 $package=Join-Path $output $name
 New-Item -ItemType Directory -Path $package | Out-Null
-foreach ($item in @('plugins','.agents','licenses','LICENSE.txt','HELP.md','Install-Plugin.cmd','Setup-Plugin.ps1')) {
+foreach ($item in @('plugins','.agents','licenses','LICENSE.txt','HELP.md','RESULTS-AND-AUTHORIZATION.md','Install-Plugin.cmd','Setup-Plugin.ps1')) {
     Copy-Item -LiteralPath (Join-Path $base $item) -Destination $package -Recurse
 }
 Copy-Item -LiteralPath (Join-Path $base 'desktop') -Destination (Join-Path $package 'published_app') -Recurse

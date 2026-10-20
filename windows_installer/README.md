@@ -1,5 +1,8 @@
 # Windows installer / portable setup
 
+**Latest tested update: 0.12.0.** [Tunnel package with Start-All.cmd](https://github.com/santanucompacct/SqlServerDevLens-MCP/actions/runs/39365983048/artifacts/12239920410) · [standard desktop/local-plugin package](https://github.com/santanucompacct/SqlServerDevLens-MCP/actions/runs/39365983226/artifacts/12239755561). These temporary Actions downloads require GitHub sign-in; extract both ZIP layers and check SHA256SUMS.txt. [Upgrade, large-result paging and session authorization](../docs/RESULTS-AND-AUTHORIZATION.md). Any v0.11.0 Release/downloader links below are the older published version.
+
+
 **Want the one-click tunnel connection for ChatGPT?** Follow the [illustrated tunnel / API key / ChatGPT setup guide](../Tunnel/QUICKSTART.md). It uses a separate tunnel package with Start-All.cmd; the standard local-plugin ZIP below does not contain the tunnel launcher. Check its documented download-security status before sharing a candidate.
 
 **[Download the complete Windows x64 setup ZIP](https://github.com/santanucompacct/SqlServerDevLens-MCP/releases/download/v0.11.0/SqlServerDevLens-0.11.0-win-x64.zip)** · [Release and checksum](https://github.com/santanucompacct/SqlServerDevLens-MCP/releases/tag/v0.11.0)

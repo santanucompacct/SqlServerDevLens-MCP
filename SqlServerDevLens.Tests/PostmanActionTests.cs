@@ -94,7 +94,23 @@ public class PostmanActionTests
         await Change("{\"script\":true}");await Assert.ThrowsAsync<ArgumentException>(()=>backend.PrepareRunAsync("template",default));
         await Reset();await Change("{\"route\":\"redirect\"}");run=await backend.PrepareRunAsync("template",default);response=await backend.ApplyAsync(run,default);
         Assert.Equal(302,response.HttpStatus);Assert.Equal(1,(await Stats()).GetProperty("runs").GetInt32());
-        await Reset();await Change("{\"route\":\"large\"}");run=await backend.PrepareRunAsync("template",default);response=await backend.ApplyAsync(run,default);Assert.True(response.Truncated);Assert.True(response.Body!.Length<=128000);
+        await Reset();await Change("{\"route\":\"large\"}");run=await backend.PrepareRunAsync("template",default);response=await backend.ApplyAsync(run,default);Assert.False(response.Truncated);Assert.True(response.Body!.Length>200000);
+        using var capturedWorkflow = new PostmanWorkflow(backend, (_, approve, _) => approve(true));
+        var stagedLarge = await capturedWorkflow.PrepareRunAsync("template", default);
+        var capturedLarge = await capturedWorkflow.ApplyAsync(stagedLarge.RequestId, true, default);
+        Assert.True(capturedLarge.ReadCapturedResult); Assert.Null(capturedLarge.Body);
+        var callsBeforePages = (await Stats()).GetProperty("runs").GetInt32();
+        var bodyPages = new StringBuilder(); var position = 0;
+        while (true)
+        {
+            var page = capturedWorkflow.Results.Read(capturedLarge.Capture!.ResultId, position, 32000, capturedLarge.Capture.Revision);
+            bodyPages.Append(page.Json); if (page.NextOffset is not int next) break; position = next;
+        }
+        using (var resultDoc = JsonDocument.Parse(bodyPages.ToString()))
+        using (var responseDoc = JsonDocument.Parse(resultDoc.RootElement.GetProperty("body").GetString()!))
+            Assert.Equal(200000, responseDoc.RootElement.GetProperty("data").GetString()!.Length);
+        Assert.Equal(callsBeforePages, (await Stats()).GetProperty("runs").GetInt32());
+
         await Reset();await Change("{\"route\":\"unauthorized\"}");run=await backend.PrepareRunAsync("template",default);response=await backend.ApplyAsync(run,default);Assert.Equal(401,response.HttpStatus);Assert.DoesNotContain("SENSITIVE-APP-KEY",response.Body);
         await Reset();await Change("{\"variable\":\"\"}");await Assert.ThrowsAsync<ArgumentException>(()=>backend.PrepareRunAsync("template",default));
         await Reset();await Change("{\"variable\":\"fixture-action-key\"}");await Assert.ThrowsAsync<ArgumentException>(()=>backend.PrepareRunAsync("template",default));

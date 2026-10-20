@@ -49,7 +49,7 @@ public class ServerTests
         await pipe.ConnectAsync(cancellationToken);
         await using var client = await McpClient.CreateAsync(new StreamClientTransport(pipe, pipe), cancellationToken: cancellationToken);
         var tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
-        Assert.Equal(25, tools.Count); Assert.Contains(tools, t => t.Name == "get_server_status");
+        Assert.Equal(27, tools.Count); Assert.Contains(tools, t => t.Name == "get_server_status");
         var result = await client.CallToolAsync("get_server_status", cancellationToken: cancellationToken);
         var text = Assert.IsType<TextContentBlock>(result.Content[0]).Text;
         var status = JsonDocument.Parse(text).RootElement;
@@ -94,7 +94,7 @@ public class ServerTests
             Command = "dotnet", Arguments = [dll, "--desktop", "--pipe-name", name]
         }), cancellationToken: timeout.Token);
         var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-        Assert.Equal(25, tools.Count);
+        Assert.Equal(27, tools.Count);
         var result = await client.CallToolAsync("get_server_status", cancellationToken: timeout.Token);
         Assert.NotEmpty(result.Content);
         await server.StopAsync();

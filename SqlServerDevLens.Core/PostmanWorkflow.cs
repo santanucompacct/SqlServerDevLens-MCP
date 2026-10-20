@@ -21,7 +21,7 @@ public sealed class PostmanPlan(string action, string name, string revision, str
 }
 internal sealed record ResolvedPostmanRequest(string Method, string Url, Dictionary<string, string> Headers, string? Body);
 public sealed record PostmanActionResult(string Status, string? ResourceId = null, int? HttpStatus = null,
-    string? Body = null, bool Truncated = false, string Message = "");
+    string? Body = null, bool Truncated = false, string Message = "", CapturedResultReference? Capture = null, bool ReadCapturedResult = false);
 public sealed class PostmanReviewChangedException() : InvalidOperationException("Postman collection, variables or authentication changed after review. Nothing was sent. Prepare and approve again.");
 public sealed record PostmanItem(string Id, string Path, string Kind, string? Method);
 public interface IPostmanActionBackend : IDisposable
@@ -36,8 +36,11 @@ public interface IPostmanActionBackend : IDisposable
 }
 
 public sealed class PostmanWorkflow(IPostmanActionBackend backend,
-    Action<ProcedureReview, Action<bool>, CancellationToken>? review, TimeProvider? clock = null) : IDisposable
+    Action<ProcedureReview, Action<bool>, CancellationToken>? review, TimeProvider? clock = null,
+    SessionAuthorization? authorization = null, CapturedResults? results = null) : IDisposable
 {
+    public CapturedResults Results { get; } = results ?? new(clock);
+    private readonly Dictionary<string, long> _automatic = [];
     private readonly TimeProvider _clock = clock ?? TimeProvider.System;
     private readonly CancellationTokenSource _stop = new();
     private readonly object _gate = new();
@@ -58,7 +61,7 @@ public sealed class PostmanWorkflow(IPostmanActionBackend backend,
     private ProcedureRequestStatus Stage(PostmanPlan plan)
     {
         _stop.Token.ThrowIfCancellationRequested();
-        if (review is null) throw new InvalidOperationException("Desktop Postman approval is unavailable. Nothing was executed.");
+        if (review is null && authorization is null) throw new InvalidOperationException("Desktop Postman approval is unavailable. Nothing was executed.");
         var id = Convert.ToHexString(RandomNumberGenerator.GetBytes(24)); var expires = _clock.GetUtcNow().AddMinutes(5);
         var diff = plan.Scope + "\n\n" + (plan.Action == "run" ? plan.After : ProcedureSql.Diff(plan.Before, plan.After));
         var display = new ProcedureReview(id, backend.CollectionName, "Postman", plan.Name, plan.Action,
@@ -66,12 +69,20 @@ public sealed class PostmanWorkflow(IPostmanActionBackend backend,
         lock (_gate)
         {
             _stop.Token.ThrowIfCancellationRequested();
-            foreach (var old in _pending.Where(x => x.Value.Review.ExpiresAt <= _clock.GetUtcNow()).Select(x=>x.Key).ToArray()) _pending.Remove(old);
+            foreach (var old in _pending.Where(x => x.Value.Review.ExpiresAt <= _clock.GetUtcNow()).Select(x=>x.Key).ToArray()) { _pending.Remove(old); _automatic.Remove(old); }
             if (_pending.Count >= 5) throw new InvalidOperationException("Too many Postman approvals. Complete them or wait for expiry.");
             _pending.Add(id, (plan, display, "pending"));
         }
+        var category = SessionAuthorization.Category(display);
+        if (authorization?.Grant(category) is long grant)
+        {
+            lock (_gate) { _automatic[id] = grant; _pending[id] = (plan, display, "approved"); }
+            authorization.RecordUse(category);
+            return Status(id);
+        }
         try
         {
+            if (review is null) throw new InvalidOperationException("Manual desktop review is unavailable.");
             review(display, approved => { lock (_gate)
                 if (_pending.TryGetValue(id, out var current) && current.Status == "pending")
                     _pending[id] = (current.Plan, current.Review, approved && !_stop.IsCancellationRequested && _clock.GetUtcNow() < expires ? "approved" : "denied");
@@ -83,25 +94,37 @@ public sealed class PostmanWorkflow(IPostmanActionBackend backend,
     private (PostmanPlan Plan, ProcedureReview Review, string Status) Find(string id)
     {
         if (_stop.IsCancellationRequested || !_pending.TryGetValue(id, out var value)) throw new ArgumentException("Postman request is unknown, consumed or cleared by Stop.");
-        if (_clock.GetUtcNow() >= value.Review.ExpiresAt) { _pending.Remove(id); throw new ArgumentException("Postman request expired. Prepare again."); }
+        if (_clock.GetUtcNow() >= value.Review.ExpiresAt) { _pending.Remove(id); _automatic.Remove(id); throw new ArgumentException("Postman request expired. Prepare again."); }
         return value;
     }
     public ProcedureRequestStatus Status(string id)
-    { lock (_gate) { var value = Find(id); return new(id, value.Status, value.Review.ExpiresAt, value.Review.Diff); } }
+    { lock (_gate) { var value = Find(id); return new(id, value.Status, value.Review.ExpiresAt, value.Review.Diff, _automatic.ContainsKey(id) ? "session_policy" : "manual"); } }
     public async Task<PostmanActionResult> ApplyAsync(string id, bool run, CancellationToken token)
     {
+        lock (_gate) _ = Find(id);
+        using var capture = Results.Reserve();
         PostmanPlan plan;
         lock (_gate)
         {
             var value = Find(id);
             if ((value.Plan.Action == "run") != run) throw new ArgumentException("Postman approval belongs to a different action.");
             if (value.Status != "approved") throw new InvalidOperationException("Explicit approval in DevLens is required. Nothing was executed.");
+            if (_automatic.TryGetValue(id, out var grant)) authorization!.Check(SessionAuthorization.Category(value.Review), grant);
+            _automatic.Remove(id);
             plan = value.Plan; _pending.Remove(id); // Consume before any external request. Never replay.
         }
-        try { return await ReadOperation(ct => backend.ApplyAsync(plan, ct), token); }
+        try
+        {
+            var result = await ReadOperation(ct => backend.ApplyAsync(plan, ct), token);
+            if (!run) return result;
+            var reference = capture.Save(result);
+            return reference.TotalCharacters <= CapturedResults.InlineCharacters ? result with { Capture = reference }
+                : result with { Body = null, Capture = reference, ReadCapturedResult = true,
+                    Message = result.Message + " Full masked HTTP result captured. Read read_result_page; do not run HTTP again to fetch pages." };
+        }
         catch (PostmanReviewChangedException) { throw; }
         catch (Exception error) when (error is OperationCanceledException or InvalidOperationException or IOException)
         { throw new InvalidOperationException("Postman action failed or timed out. It may already have been saved or executed. Verify state; never retry automatically. Approval was consumed."); }
     }
-    public void Dispose() { _stop.Cancel(); lock (_gate) _pending.Clear(); backend.Dispose(); }
+    public void Dispose() { _stop.Cancel(); lock (_gate) { _pending.Clear(); _automatic.Clear(); } if (results is null) Results.Dispose(); backend.Dispose(); }
 }

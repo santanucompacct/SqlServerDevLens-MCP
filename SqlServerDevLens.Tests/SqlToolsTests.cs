@@ -70,7 +70,7 @@ public class SqlToolsTests
         await using var client = await McpClient.CreateAsync(new StdioClientTransport(new()
         { Command = "dotnet", Arguments = [dll, "--desktop", "--pipe-name", name] }), cancellationToken: timeout.Token);
         var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-        Assert.Equal(25, tools.Count);
+        Assert.Equal(27, tools.Count);
         var status = await client.CallToolAsync("get_server_status", cancellationToken: timeout.Token);
         Assert.Contains("\"sqlConfigured\":true", Assert.IsType<TextContentBlock>(status.Content[0]).Text);
         foreach (var tool in new[] { "get_database_info", "list_database_objects", "describe_table", "query_read_only" })
@@ -146,7 +146,7 @@ public class LiveSqlTests
         var result = await database.QueryAsync("SELECT n FROM (VALUES (1),(2),(3)) t(n) ORDER BY n", 2, timeout.Token);
         Assert.Equal(2, result.Rows.Count); Assert.True(result.Truncated);
         var values = await database.QueryAsync("SELECT CAST(NULL AS int) n, REPLICATE(CAST('x' AS varchar(max)),3000) text_value, CAST(0x1234 AS varbinary(max)) binary_value", 1, timeout.Token);
-        Assert.Null(values.Rows[0][0]); Assert.Equal(2000, ((string)values.Rows[0][1]!).Length);
+        Assert.Null(values.Rows[0][0]); Assert.Equal(3000, ((string)values.Rows[0][1]!).Length);
         Assert.True(values.ValuesTruncated);
         await Assert.ThrowsAsync<ArgumentException>(() => database.QueryAsync("DELETE FROM dbo.T", 1, timeout.Token));
         using var cancelled = new CancellationTokenSource(); cancelled.Cancel();

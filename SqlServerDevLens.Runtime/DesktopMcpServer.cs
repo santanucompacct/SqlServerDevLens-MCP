@@ -164,8 +164,11 @@ public sealed class DesktopMcpServer(string? pipeName = null) : IDesktopMcpServe
             sqlConfigured = database is not null, sqlConnected = false, database = database?.Database,
             lastSqlTestSucceeded = true, lastSqlTestUtc = testedAt, postmanImplemented = true,
             postmanConfigured = postman is not null, postmanRequestExecutionEnabled = postmanActions is not null,
-            message = "SQL connections open per operation and are disposed. SQL actions and Postman changes/runs require explicit desktop approval."
+            authorization = database?.Authorization?.Snapshot(),
+            capturedResultMaxCharacters = CapturedResults.MaxCaptureCharacters, capturedResultsExpireMinutes = 15,
+            message = "SQL connections open per operation and are disposed. Actions require manual approval unless the operator enabled the matching session-only checkbox. No automatic retries."
         }, new() { Name = "get_server_status", Description = "Returns desktop server state and last SQL test; does not query SQL." }),
+        ..new CapturedResultTools(database?.Results ?? postmanActions?.Results).CreateTools(),
         ..new DatabaseTools(database).CreateTools(), ..new ProcedureTools(database?.Procedures).CreateTools(),
         ..new PostmanTools(postman, postmanActions).CreateTools()
     ];

@@ -11,6 +11,7 @@ public class TableSqlTests
     [InlineData("ALTER TABLE dbo.Example ALTER COLUMN label nvarchar(100) NULL", "table_alter")]
     [InlineData("INSERT dbo.Example(id,label) VALUES(1,N'one'),(2,N'two')", "table_insert")]
     [InlineData("UPDATE dbo.Example SET label=N'updated' WHERE id=1", "table_update")]
+    [InlineData("DELETE dbo.Example WHERE id=1", "table_delete")]
     public void AcceptsExactScopedOperations(string sql, string action) => Assert.Equal(action, TableSql.Validate("dbo", "Example", sql, 10).Action);
 
     [Theory]
@@ -26,7 +27,12 @@ public class TableSqlTests
     [InlineData("UPDATE dbo.Example SET label=N'x' OUTPUT inserted.id WHERE id=1")]
     [InlineData("INSERT dbo.Example(id) SELECT id FROM dbo.Other")]
     [InlineData("INSERT dbo.Example EXEC dbo.Something")]
-    [InlineData("DELETE dbo.Example WHERE id=1")]
+    [InlineData("DELETE dbo.Example")]
+    [InlineData("DELETE TOP(1) dbo.Example WHERE id=1")]
+    [InlineData("DELETE e FROM dbo.Example e WHERE id=1")]
+    [InlineData("DELETE OtherDb.dbo.Example WHERE id=1")]
+    [InlineData("DELETE dbo.Example OUTPUT deleted.id WHERE id=1")]
+    [InlineData("DELETE dbo.Example WHERE id IN (SELECT id FROM dbo.Other)")]
     [InlineData("TRUNCATE TABLE dbo.Example")]
     [InlineData("DROP TABLE dbo.Example")]
     [InlineData("ALTER TABLE dbo.Example DROP COLUMN label")]

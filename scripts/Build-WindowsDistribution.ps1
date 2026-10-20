@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$Version = '0.11.0')
+param([string]$Version = '0.12.0')
 $ErrorActionPreference = 'Stop'
 if (-not $IsWindows) { throw 'Build/test this Windows package on Windows with PowerShell 7.' }
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Version must be a numeric semantic version.' }
@@ -38,6 +38,7 @@ foreach ($name in @('Setup-Plugin.ps1', 'Install-Plugin.cmd', 'Start-DevLens.cmd
     Copy-Item -LiteralPath (Join-Path $repo "distribution/$name") -Destination $package
 }
 Copy-Item -LiteralPath (Join-Path $repo 'docs/CONNECTING-TO-CHATGPT.md') -Destination (Join-Path $package 'HELP.md')
+Copy-Item -LiteralPath (Join-Path $repo 'docs/RESULTS-AND-AUTHORIZATION.md') -Destination $package
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSE.txt') -Destination $package
 
 # Preserve declared licenses and license/notice files available in dependency packages.
