@@ -173,16 +173,16 @@
                                 <StackPanel Spacing="5">
                                     <TextBlock Text="Automatic authorization — this session only" FontWeight="SemiBold" TextWrapping="Wrap" />
                                     <TextBlock Text="Checked actions skip the approval dialog. Procedures and HTTP requests may change or delete data. Only enable categories you intend to delegate. Unchecking invalidates unused automatic approvals; already started actions cannot be undone. All boxes reset on Stop/restart." FontSize="12" TextWrapping="Wrap" Foreground="#FBBF24" />
-                                    <CheckBox Content="Execute stored procedures" IsChecked="{Binding AutoProcedureExecution}" IsEnabled="{Binding IsRunning}" />
-                                    <CheckBox Content="Create stored procedures" IsChecked="{Binding AutoProcedureCreate}" IsEnabled="{Binding IsRunning}" />
-                                    <CheckBox Content="Modify stored procedures" IsChecked="{Binding AutoProcedureAlter}" IsEnabled="{Binding IsRunning}" />
-                                    <CheckBox Content="Create tables" IsChecked="{Binding AutoTableCreate}" IsEnabled="{Binding IsRunning}" />
-                                    <CheckBox Content="Modify table structure" IsChecked="{Binding AutoTableAlter}" IsEnabled="{Binding IsRunning}" />
-                                    <CheckBox Content="INSERT table rows" IsChecked="{Binding AutoInsert}" IsEnabled="{Binding IsRunning}" />
-                                    <CheckBox Content="UPDATE table rows" IsChecked="{Binding AutoUpdate}" IsEnabled="{Binding IsRunning}" />
-                                    <CheckBox Content="DELETE table rows (WHERE required)" IsChecked="{Binding AutoDelete}" IsEnabled="{Binding IsRunning}" />
-                                    <CheckBox Content="Run Postman HTTP requests" IsChecked="{Binding AutoPostmanRun}" IsEnabled="{Binding IsRunning}" />
-                                    <CheckBox Content="Create/edit Postman requests or folders" IsChecked="{Binding AutoPostmanChange}" IsEnabled="{Binding IsRunning}" />
+                                    <CheckBox Content="Execute stored procedures" IsChecked="{Binding AutoProcedureExecution}" IsEnabled="{Binding CanStop}" />
+                                    <CheckBox Content="Create stored procedures" IsChecked="{Binding AutoProcedureCreate}" IsEnabled="{Binding CanStop}" />
+                                    <CheckBox Content="Modify stored procedures" IsChecked="{Binding AutoProcedureAlter}" IsEnabled="{Binding CanStop}" />
+                                    <CheckBox Content="Create tables" IsChecked="{Binding AutoTableCreate}" IsEnabled="{Binding CanStop}" />
+                                    <CheckBox Content="Modify table structure" IsChecked="{Binding AutoTableAlter}" IsEnabled="{Binding CanStop}" />
+                                    <CheckBox Content="INSERT table rows" IsChecked="{Binding AutoInsert}" IsEnabled="{Binding CanStop}" />
+                                    <CheckBox Content="UPDATE table rows" IsChecked="{Binding AutoUpdate}" IsEnabled="{Binding CanStop}" />
+                                    <CheckBox Content="DELETE table rows (WHERE required)" IsChecked="{Binding AutoDelete}" IsEnabled="{Binding CanStop}" />
+                                    <CheckBox Content="Run Postman HTTP requests" IsChecked="{Binding AutoPostmanRun}" IsEnabled="{Binding CanStop}" />
+                                    <CheckBox Content="Create/edit Postman requests or folders" IsChecked="{Binding AutoPostmanChange}" IsEnabled="{Binding CanStop}" />
                                 </StackPanel>
                             </Border>
                             <TextBlock Text="SQL exploration and procedure tools are available for this database. Actions require review and manual approval unless enabled for this session. INSERT, UPDATE and DELETE remain transactional and scoped. Table data actions use a transaction and row limit. Private schema backups do not back up table rows. Each operation opens and closes its own connection." TextWrapping="Wrap" />

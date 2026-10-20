@@ -110,6 +110,23 @@ public class LargeResultsAuthorizationTests
         Assert.Equal(LargeText, captured.RootElement.GetProperty("body").GetString()); Assert.Equal(1, backend.Executions);
     }
     [Fact]
+    public async Task InsertCheckboxCannotGrantDeleteAndRevokedDeleteCannotApply()
+    {
+        var policy = new SessionAuthorization(); var backend = new Backend();
+        using var workflow = new ProcedureWorkflow(backend, (_, _, _) => { }, authorization: policy);
+        policy.Set("table_insert", true);
+        var insert = await workflow.PrepareTableAsync("dbo", "Example", "INSERT dbo.Example(id) VALUES(1)", 1, default);
+        Assert.Equal("session_policy", insert.Authorization); Assert.Equal("approved", insert.Status);
+        var deletion = await workflow.PrepareTableAsync("dbo", "Example", "DELETE dbo.Example WHERE id=1", 1, default);
+        Assert.Equal("pending", deletion.Status);
+        policy.Set("table_delete", true);
+        deletion = await workflow.PrepareTableAsync("dbo", "Example", "DELETE dbo.Example WHERE id=1", 1, default);
+        Assert.Equal("approved", deletion.Status);
+        policy.Set("table_delete", false);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => workflow.ApplyTableAsync(deletion.RequestId, default));
+        Assert.Equal(0, backend.Executions);
+    }
+    [Fact]
     public async Task DesktopCheckboxesResetOnStop()
     {
         await using var server = new DesktopMcpServer("dva-" + Guid.NewGuid().ToString("N"));
@@ -148,7 +165,7 @@ public class LargeResultsAuthorizationTests
         Assert.Throws<ArgumentException>(() => data.Results.Read(reference.ResultId));
     }
     private sealed class Clock : TimeProvider { public DateTimeOffset Now = DateTimeOffset.UtcNow; public override DateTimeOffset GetUtcNow() => Now; }
-    private sealed class Backend : IProcedureBackend
+    private sealed class Backend : IProcedureBackend, ITableActionBackend
     {
         public string Database => "Synthetic"; public int Executions;
         public Task<ProcedureDefinition?> ReadAsync(string schema, string name, CancellationToken token) => Task.FromResult<ProcedureDefinition?>(new(schema,name,"CREATE PROC dbo.Example AS SELECT 1","r1",true,true,[]));
@@ -161,6 +178,8 @@ public class LargeResultsAuthorizationTests
             return Task.FromResult(new ProcedureExecution(sets,new Dictionary<string,object?> { ["@output"] = new string('o',130000) },9,true,"completed"));
         }
         public Task<ProcedureApplyResult> ApplyAsync(string schema,string name,string sql,ProcedureDefinition? previous,CancellationToken token) => Task.FromResult(new ProcedureApplyResult("applied",true));
+        public Task<TableSqlSnapshot> PrepareTableAsync(TableSqlPlan plan, CancellationToken token) => Task.FromResult(new TableSqlSnapshot(plan,"r1","synthetic metadata",1));
+        public Task<TableSqlResult> ApplyTableAsync(TableSqlSnapshot snapshot, CancellationToken token) { Executions++; return Task.FromResult(new TableSqlResult("committed",1,false)); }
     }
     private sealed class PostmanBackend : IPostmanActionBackend
     {
