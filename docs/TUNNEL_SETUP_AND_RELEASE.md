@@ -1,5 +1,8 @@
 # Tunnel setup, verification and separate release
 
+**20 October 2026 update:** The owner reported successful testing of 0.12.0. Remote discovery was independently confirmed at 27 tools after refreshing the existing connector and restarting the chat, including `read_result_page` and `release_result`. See [latest tested downloads](../README.md#latest-0120-windows-packages) and [large results, session authorization and refresh instructions](RESULTS-AND-AUTHORIZATION.md). Earlier installation observations below retain their original verification date. No private tunnel profile is distributed.
+
+
 Verification date: **19 October 2026**. Tunnel source is being integrated into `master` at the owner's request; `Tunnel_Installation` remains supported by the dedicated workflow. Standard v0.11.0 assets and the existing standard release workflow are preserved.
 
 **Recipient guide:** [Illustrated tunnel, key, INI and ChatGPT connection setup](../Tunnel/QUICKSTART.md). [Exact candidate security checks and unresolved Chrome warning](../Tunnel/DOWNLOAD-VALIDATION.md). This document records inspected facts and explicitly distinguishes offline package tests from account-dependent remote validation.

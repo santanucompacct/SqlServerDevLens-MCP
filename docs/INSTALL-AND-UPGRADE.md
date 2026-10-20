@@ -1,5 +1,8 @@
 # Install or upgrade SQL Server DevLens 0.11.0
 
+**Latest tested update: 0.12.0.** [Tunnel package with Start-All.cmd](https://github.com/santanucompacct/SqlServerDevLens-MCP/actions/runs/39365983048/artifacts/12239920410) · [standard desktop/local-plugin package](https://github.com/santanucompacct/SqlServerDevLens-MCP/actions/runs/39365983226/artifacts/12239755561). These temporary Actions downloads require GitHub sign-in; extract both ZIP layers and check SHA256SUMS.txt. [Upgrade, large-result paging and session authorization](RESULTS-AND-AUTHORIZATION.md). Any v0.11.0 Release/downloader links below are the older published version.
+
+
 Use **one registered DevLens Local source per computer**: either a source checkout or the complete Windows portable package. Both SQL-only and SQL + Postman use `sql-server-devlens@devlens-local` and the bundled `devlens-workflow` skill. The desktop application and adapter must both be updated for new tools. Building the desktop alone does not update the installed adapter.
 
 ## New Windows installation without Visual Studio

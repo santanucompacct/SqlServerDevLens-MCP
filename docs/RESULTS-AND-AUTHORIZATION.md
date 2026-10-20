@@ -1,4 +1,4 @@
-# Large results and session authorization (0.12.0 candidate)
+# Large results and session authorization (0.12.0)
 
 This update targets the application, desktop runtime and stdio adapter together. It does not modify production procedures or table data. Stable release downloads remain at their existing version until a new release is explicitly published.
 
@@ -65,6 +65,19 @@ These bounds are reported as limits or explicit errors. A procedure/HTTP request
 
 ## Upgrade and verify
 
-Stop DevLens and the tunnel before replacing executables. Build/publish **both** desktop and adapter from this feature branch (or the merged release). Source users should publish the adapter into the registered plugin folder, reinstall/refresh it, then restart the host/refresh remote connector discovery. The 0.12.0 adapter advertises 27 tools, including `read_result_page` and `release_result`; an old adapter cannot forward those new tools. Tunnel users should replace the complete tunnel package and retain their private INI separately.
+Stop DevLens and the tunnel before replacing executables. Build/publish **both** desktop and adapter from master after this update is merged. Source users should publish the adapter into the registered plugin folder, reinstall/refresh it, then restart the host/refresh remote connector discovery. The 0.12.0 adapter advertises 27 tools, including `read_result_page` and `release_result`; an old adapter cannot forward those new tools. Tunnel users should replace the complete tunnel package and retain their private INI separately.
 
 First verify status and both new tool names. Test large data with a synthetic fixture before using an actual report. Leave all checkboxes off for the first run. Enabling a checkbox is the operator's local authorization decision; no production checkbox is enabled by these tests or source changes. Live reproduction of the three purchase-report calls requires rebuilding, starting DevLens and separate approval (or the intended checkbox) for each exact execution. No real company hashes, report definitions or result payloads are committed in the test fixtures.
+
+
+## Connector discovery after upgrading
+
+The updated adapter advertises **27 tools**, including `read_result_page` and `release_result`. Updating the desktop alone is insufficient. Keep the desktop and tunnel running from the new package, open the existing custom MCP connection in ChatGPT Plugins and select **Refresh**. Confirm both new names appear, then start a new chat with that plugin selected. See [OpenAI metadata refresh instructions](https://developers.openai.com/plugins/deploy/connect-chatgpt#refresh-metadata). Preserve the existing plugin identity and tunnel selection.
+
+If a chat still sees 25 tools, do not rerun a procedure just to retrieve its output. Check the adapter path in the active tunnel profile, refresh the correct connector and recheck discovery. Captures expire after 15 minutes and Stop/restart clears them. Once expired, a new execution is a new action and needs its own authorization.
+
+## Verification recorded 20 October 2026
+
+The owner reported successful live testing and approved merging this update. Independently, the remote connector in this development chat exposed all 27 tools after refresh/restart and `get_server_status` returned running. The packaged adapter also passed isolated initialization/tool discovery with 27 tools. This status/discovery check did not execute SQL or verify the full contents of a live captured procedure result. No production definitions, result payloads or credentials are included here.
+
+Automated validation at application commit `fea5025c07e112e785bc071b35d1e18b41c6a9cf`: Windows, Linux and macOS build/tests, disposable SQL integration and Postman simulation passed in [run 39365983041](https://github.com/santanucompacct/SqlServerDevLens-MCP/actions/runs/39365983041). Both [standard package](https://github.com/santanucompacct/SqlServerDevLens-MCP/actions/runs/39365983226) and [tunnel package](https://github.com/santanucompacct/SqlServerDevLens-MCP/actions/runs/39365983048) workflows succeeded. Download links are maintained in the [README](../README.md#latest-0120-windows-packages); these are test artifacts, not a new published Release.

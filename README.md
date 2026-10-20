@@ -4,11 +4,19 @@
 
 **Your SQL Server, understood by AI.** MIT-licensed .NET 10 / Avalonia desktop application with owl branding.
 
-## 0.12.0 candidate: large captured results and session authorization
+## Latest 0.12.0 Windows packages
 
-[Results, checkboxes, upgrade steps and full limits audit](docs/RESULTS-AND-AUTHORIZATION.md). Procedure/SELECT/table text is no longer clipped at 2,000 characters; large procedure results and masked HTTP responses are captured once and read through `read_result_page` without re-execution. `release_result` frees a capture. The candidate adapter advertises 27 tools.
+- **Tunnel / ChatGPT Web (includes Start-All.cmd):** [download tested tunnel artifact](https://github.com/santanucompacct/SqlServerDevLens-MCP/actions/runs/39365983048/artifacts/12239920410).
+- **Desktop local plugin:** [download tested Windows artifact](https://github.com/santanucompacct/SqlServerDevLens-MCP/actions/runs/39365983226/artifacts/12239755561).
+- [Changes, limits and upgrade checklist](docs/RESULTS-AND-AUTHORIZATION.md).
 
-Ten unchecked-by-default desktop checkboxes delegate individual SQL/Postman action categories for the active running session; Stop/restart clears them. Prepare/validate/freeze/single-use apply, revision checks and SQL permissions remain. Scoped `DELETE ... WHERE` is now supported with the existing transaction and 1–500 direct-row guard. Procedure execution and HTTP requests can themselves change/delete data. This source candidate does not replace the published stable downloads below.
+These are successful GitHub Actions test packages, require GitHub sign-in and expire. Extract the artifact ZIP and then the application ZIP inside; verify the inner ZIP against its bundled SHA256SUMS.txt. They are not permanent Release assets. The pinned v0.11.0 downloader below remains for the older published release and does not install 0.12.0. Functional testing does not clear the previously reported Chrome download warning; see [download validation](Tunnel/DOWNLOAD-VALIDATION.md).
+
+## 0.12.0: large captured results and session authorization
+
+[Results, checkboxes, upgrade steps and full limits audit](docs/RESULTS-AND-AUTHORIZATION.md). Procedure/SELECT/table text is no longer clipped at 2,000 characters; large procedure results and masked HTTP responses are captured once and read through `read_result_page` without re-execution. `release_result` frees a capture. The updated adapter advertises 27 tools.
+
+Ten unchecked-by-default desktop checkboxes delegate individual SQL/Postman action categories for the active running session; Stop/restart clears them. Prepare/validate/freeze/single-use apply, revision checks and SQL permissions remain. Scoped `DELETE ... WHERE` is now supported with the existing transaction and 1–500 direct-row guard. Procedure execution and HTTP requests can themselves change/delete data. The tested 0.12.0 package links are above; the older published release remains separately labelled.
 
 ## Version 0.11.0: large SQL procedures/tables and Windows portable distribution
 
