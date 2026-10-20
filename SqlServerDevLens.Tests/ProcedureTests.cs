@@ -48,6 +48,17 @@ public class ProcedureTests
         SqlProcedureBackend.Bind(Definition(new ProcedureParameterInfo("@id", "int", 4, 10, 0, false, false)), json));
 
     [Fact]
+    public void MaxTextParametersAndOutputsAreNotBoundAtTwentyThousand()
+    {
+        var text = new string('x', 130000);
+        var parameters = SqlProcedureBackend.Bind(Definition(new("@json", "nvarchar", -1, 0, 0, false, false),
+            new("@output", "nvarchar", -1, 0, 0, true, false)), System.Text.Json.JsonSerializer.Serialize(new { json = text }));
+        Assert.Equal(text, parameters[0].Value); Assert.Equal(-1, parameters[1].Size);
+        Assert.Throws<ArgumentException>(() => SqlProcedureBackend.Bind(Definition(new ProcedureParameterInfo("@json", "nvarchar", 20, 0, 0, false, false)),
+            System.Text.Json.JsonSerializer.Serialize(new { json = text })));
+    }
+
+    [Fact]
     public async Task ApprovalIsExplicitSingleUseAndCannotBeReplacedByAnotherAction()
     {
         var backend = new FakeBackend(); Action<bool>? decision = null;

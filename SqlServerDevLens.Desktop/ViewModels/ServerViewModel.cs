@@ -13,6 +13,42 @@ namespace SqlServerDevLens.Desktop.ViewModels;
 public partial class ServerViewModel : ViewModelBase
 {
     private readonly IDesktopMcpServer _server;
+    public SessionAuthorization Authorization { get; } = new();
+    [ObservableProperty] private bool _autoProcedureExecution;
+    partial void OnAutoProcedureExecutionChanged(bool value) => Authorization.Set("procedure_execute", value);
+    [ObservableProperty] private bool _autoProcedureCreate;
+    partial void OnAutoProcedureCreateChanged(bool value) => Authorization.Set("procedure_create", value);
+    [ObservableProperty] private bool _autoProcedureAlter;
+    partial void OnAutoProcedureAlterChanged(bool value) => Authorization.Set("procedure_alter", value);
+    [ObservableProperty] private bool _autoTableCreate;
+    partial void OnAutoTableCreateChanged(bool value) => Authorization.Set("table_create", value);
+    [ObservableProperty] private bool _autoTableAlter;
+    partial void OnAutoTableAlterChanged(bool value) => Authorization.Set("table_alter", value);
+    [ObservableProperty] private bool _autoInsert;
+    partial void OnAutoInsertChanged(bool value) => Authorization.Set("table_insert", value);
+    [ObservableProperty] private bool _autoUpdate;
+    partial void OnAutoUpdateChanged(bool value) => Authorization.Set("table_update", value);
+    [ObservableProperty] private bool _autoDelete;
+    partial void OnAutoDeleteChanged(bool value) => Authorization.Set("table_delete", value);
+    [ObservableProperty] private bool _autoPostmanRun;
+    partial void OnAutoPostmanRunChanged(bool value) => Authorization.Set("postman_run", value);
+    [ObservableProperty] private bool _autoPostmanChange;
+    partial void OnAutoPostmanChangeChanged(bool value) => Authorization.Set("postman_change", value);
+    private void ResetAuthorization()
+    {
+        AutoProcedureExecution = false;
+        AutoProcedureCreate = false;
+        AutoProcedureAlter = false;
+        AutoTableCreate = false;
+        AutoTableAlter = false;
+        AutoInsert = false;
+        AutoUpdate = false;
+        AutoDelete = false;
+        AutoPostmanRun = false;
+        AutoPostmanChange = false;
+        Authorization.Reset();
+    }
+
     public ObservableCollection<ServerActivity> ActivityEntries { get; } = [];
     [ObservableProperty] private bool _isRunning;
     [ObservableProperty] private bool _isBusy;
@@ -27,33 +63,35 @@ public partial class ServerViewModel : ViewModelBase
     public ServerViewModel(IDesktopMcpServer server)
     {
         _server = server;
+        Authorization.Changed += (category, enabled) => _server.Activity.Add("Session authorization", enabled ? "Enabled" : "Disabled", category + " · local operator setting; resets on Stop.");
+        Authorization.Used += category => _server.Activity.Add("Session authorization", "Auto-authorized", category + " · exact validated request staged; applying is a separate single-use call.");
         _server.Activity.Changed += () => Dispatcher.UIThread.Post(() =>
         {
             ActivityEntries.Clear();
             foreach (var entry in _server.Activity.Snapshot()) ActivityEntries.Add(entry);
         });
         _server.StoppedUnexpectedly += () => Dispatcher.UIThread.Post(() =>
-        { IsRunning = false; Status = "Server stopped unexpectedly. Return to connection setup and test again."; });
+        { ResetAuthorization(); IsRunning = false; Status = "Server stopped unexpectedly. Return to connection setup and test again."; });
     }
     partial void OnIsRunningChanged(bool value) { OnPropertyChanged(nameof(CanStop)); OnPropertyChanged(nameof(CanReturn)); }
     partial void OnIsBusyChanged(bool value) { OnPropertyChanged(nameof(CanStop)); OnPropertyChanged(nameof(CanReturn)); }
     public async Task StartAsync(ConnectionProfile profile, string notice, string? password = null, PostmanSelection? postman = null, string? postmanKey = null)
     {
-        IsBusy = true; Status = "Starting MCP server…";
+        ResetAuthorization(); IsBusy = true; Status = "Starting MCP server…";
         ConnectionSummary = $"{profile.Host}:{profile.Port} / {profile.Database}";
         ConnectionNotice = notice;
         PostmanSummary = postman is null ? "Postman disabled — SQL Server Only."
-            : $"Postman: {postman.Workspace.Name} / {postman.Collection.Name} — {postman.Requests.Length} startup requests. Changes and HTTP runs require explicit approval in DevLens.";
+            : $"Postman: {postman.Workspace.Name} / {postman.Collection.Name} — {postman.Requests.Length} startup requests. Actions require manual approval unless their session checkbox is enabled.";
         try
         {
             var database = new SqlDatabase(profile, password, (request, decision, token) =>
             {
                 if (RequestProcedureReview is null) { decision(false); return; }
                 Review(request, decision, token);
-            });
+            }, Authorization);
             PostmanWorkflow? postmanActions = postman is not null && !string.IsNullOrEmpty(postmanKey)
                 ? new PostmanWorkflow(new PostmanActionBackend(postmanKey, postman), (request, decision, token) =>
-                    { if(RequestProcedureReview is null) { decision(false); return; } Review(request, decision, token); }) : null;
+                    { if(RequestProcedureReview is null) { decision(false); return; } Review(request, decision, token); }, authorization: Authorization, results: database.Results) : null;
             try { await _server.StartAsync(DateTimeOffset.UtcNow, database, postman, postmanActions); }
             catch { database.Dispose(); postmanActions?.Dispose(); throw; }
             IsRunning = _server.IsRunning;
@@ -80,6 +118,7 @@ public partial class ServerViewModel : ViewModelBase
     [RelayCommand]
     public async Task StopAsync()
     {
+        ResetAuthorization();
         IsBusy = true;
         try { await _server.StopAsync(); IsRunning = false; Status = "Stopped — desktop sessions closed. The updated ChatGPT plugin reconnects on its next status call after DevLens starts again."; }
         finally { IsBusy = false; }

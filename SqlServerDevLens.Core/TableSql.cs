@@ -61,8 +61,14 @@ public static class TableSql
                 target = DirectTarget(update.UpdateSpecification); action = "table_update";
                 new Sql170ScriptGenerator().GenerateScript(update.UpdateSpecification.WhereClause.SearchCondition, out predicate);
                 break;
+            case DeleteStatement delete when delete.WithCtesAndXmlNamespaces is null && delete.OptimizerHints.Count == 0 &&
+                delete.DeleteSpecification.WhereClause is not null && delete.DeleteSpecification.FromClause is null &&
+                delete.DeleteSpecification.WhereClause.Cursor is null:
+                target = DirectTarget(delete.DeleteSpecification); action = "table_delete";
+                new Sql170ScriptGenerator().GenerateScript(delete.DeleteSpecification.WhereClause.SearchCondition, out predicate);
+                break;
             default:
-                throw new ArgumentException("Only regular CREATE TABLE, ALTER ADD/ALTER COLUMN, INSERT VALUES and UPDATE with WHERE are supported. DELETE, DROP, TRUNCATE, MERGE, INSERT SELECT/EXEC, joined updates and unrestricted batches are disabled.");
+                throw new ArgumentException("Only regular CREATE TABLE, ALTER ADD/ALTER COLUMN, INSERT VALUES, UPDATE/DELETE with WHERE are supported. DROP, TRUNCATE, MERGE, INSERT SELECT/EXEC, joined updates and unrestricted batches are disabled.");
         }
         if (target.Identifiers.Count != 2 || target.Identifiers[0].Value != schema || target.Identifiers[1].Value != name)
             throw new ArgumentException("SQL must target exactly the supplied schema.table in the selected database.");

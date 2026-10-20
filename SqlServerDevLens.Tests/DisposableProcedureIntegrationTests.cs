@@ -89,6 +89,13 @@ public class DisposableProcedureIntegrationTests
             await Assert.ThrowsAsync<InvalidOperationException>(() => blockedBackend.ApplyTableAsync(blocked, timeout.Token));
             await using (var check = db.CreateCommand())
             { check.CommandText = "SELECT COUNT(*) FROM sys.columns WHERE object_id=OBJECT_ID('dbo.Example') AND name='never_added'"; Assert.Equal(0, await check.ExecuteScalarAsync(timeout.Token)); }
+            await Assert.ThrowsAsync<ArgumentException>(() => workflow.PrepareTableAsync("dbo", "Example", "DELETE dbo.Example WHERE id>0", 1, timeout.Token));
+            var deletion = await workflow.PrepareTableAsync("dbo", "Example", "DELETE dbo.Example WHERE id=3", 1, timeout.Token);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => workflow.ApplyTableAsync(deletion.RequestId, timeout.Token));
+            decision(true); Assert.Equal(1, (await workflow.ApplyTableAsync(deletion.RequestId, timeout.Token)).AffectedRows);
+            await Assert.ThrowsAsync<ArgumentException>(() => workflow.ApplyTableAsync(deletion.RequestId, timeout.Token));
+            await using (var verifyDelete = db.CreateCommand())
+            { verifyDelete.CommandText = "SELECT COUNT(*) FROM dbo.Example WHERE id=3"; Assert.Equal(0, await verifyDelete.ExecuteScalarAsync(timeout.Token)); }
             // Even a desktop-approved action cannot bypass the SQL account's rights.
             var password = "Dvl-" + Guid.NewGuid().ToString("N") + "-1!";
             await Command(admin, $"CREATE LOGIN [{login}] WITH PASSWORD=N'{password}'", timeout.Token); loginCreated = true;
@@ -99,6 +106,8 @@ public class DisposableProcedureIntegrationTests
             await Assert.ThrowsAsync<InvalidOperationException>(() => restricted.ApplyTableAsync(denied.RequestId, timeout.Token));
             await using (var check = db.CreateCommand())
             { check.CommandText = "SELECT COUNT(*) FROM dbo.Example WHERE id=4"; Assert.Equal(0, await check.ExecuteScalarAsync(timeout.Token)); }
+            var deniedDelete = await restricted.PrepareTableAsync("dbo", "Example", "DELETE dbo.Example WHERE id=2", 1, timeout.Token);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => restricted.ApplyTableAsync(deniedDelete.RequestId, timeout.Token));
         }
         finally
         {
@@ -166,10 +175,31 @@ public class DisposableProcedureIntegrationTests
             await Command(db, "CREATE PROCEDURE dbo.LargeResult AS BEGIN SET NOCOUNT ON; INSERT dbo.Effects VALUES(1); SELECT TOP(600) 1 AS n FROM sys.all_objects a CROSS JOIN sys.all_objects b; END", timeout.Token);
             var large = await workflow.PrepareExecutionAsync("dbo", "LargeResult", "{}", timeout.Token); decision(true);
             var bounded = await workflow.ExecuteAsync(large.RequestId, timeout.Token);
-            Assert.False(bounded.Completed); Assert.Equal(500, bounded.ResultSets[0].Rows.Count); Assert.True(bounded.ResultSets[0].Truncated);
+            Assert.True(bounded.Completed); Assert.Equal(600, bounded.ResultSets[0].Rows.Count); Assert.False(bounded.ResultSets[0].Truncated);
             await Assert.ThrowsAsync<ArgumentException>(() => workflow.ExecuteAsync(large.RequestId, timeout.Token));
             await using var count = db.CreateCommand(); count.CommandText = "SELECT COUNT(*) FROM dbo.Effects";
             Assert.Equal(1, await count.ExecuteScalarAsync(timeout.Token));
+            // Full large JSON/text/output parameters, >10 result sets and >100 columns: disposable DB only.
+            var textSql = "CREATE PROC dbo.FullText @output nvarchar(max) OUTPUT AS BEGIN SET NOCOUNT ON; SET @output=REPLICATE(CAST(N'o' AS nvarchar(max)),130000); SELECT REPLICATE(CAST(N'x' AS nvarchar(max)),350000) AS resultreturn; "
+                + string.Join(" ", Enumerable.Range(0, 11).Select(i => $"SELECT {i} AS n;"))
+                + " SELECT " + string.Join(",", Enumerable.Range(0, 110).Select(i => $"{i} AS c{i}")) + "; RETURN 9; END";
+            await Command(db, textSql, timeout.Token);
+            var full = await workflow.PrepareExecutionAsync("dbo", "FullText", "{}", timeout.Token); decision(true);
+            var fullResult = await workflow.ExecuteAsync(full.RequestId, timeout.Token);
+            Assert.True(fullResult.Completed); Assert.True(fullResult.ReadCapturedResult);
+            var captured = new System.Text.StringBuilder(); var cursor = 0;
+            while (true)
+            {
+                var page = workflow.Results.Read(fullResult.Capture!.ResultId, cursor, 128000, fullResult.Capture.Revision);
+                captured.Append(page.Json); if (page.NextOffset is not int next) break; cursor = next;
+            }
+            using var doc = System.Text.Json.JsonDocument.Parse(captured.ToString());
+            Assert.Equal(13, doc.RootElement.GetProperty("resultSets").GetArrayLength());
+            Assert.Equal(350000, doc.RootElement.GetProperty("resultSets")[0].GetProperty("rows")[0][0].GetString()!.Length);
+            Assert.Equal(110, doc.RootElement.GetProperty("resultSets")[12].GetProperty("columns").GetArrayLength());
+            Assert.Equal(130000, doc.RootElement.GetProperty("outputParameters").GetProperty("@output").GetString()!.Length);
+            Assert.Equal(9, doc.RootElement.GetProperty("returnCode").GetInt32());
+
         }
         finally
         {

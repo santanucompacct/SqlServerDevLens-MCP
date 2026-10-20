@@ -318,13 +318,17 @@ public sealed class PostmanActionBackend : IPostmanActionBackend
                 // Separate client: the Postman control API key can never become a default application header.
                 using var response=await _application.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,token);
                 await using var stream=await response.Content.ReadAsStreamAsync(token); using var output=new MemoryStream();
-                var buffer=new byte[8192]; var truncated=false;
-                while(true) { var read=await stream.ReadAsync(buffer,token); if(read==0) break; var take=Math.Min(read,128000-(int)output.Length); output.Write(buffer,0,take); if(take<read){truncated=true;break;} }
+                var buffer=new byte[8192];
+                while(true)
+                {
+                    var read=await stream.ReadAsync(buffer,token); if(read==0) break;
+                    if(output.Length+read>CapturedResults.MaxCaptureCharacters) throw new InvalidOperationException("HTTP response exceeds the 16 MiB capture budget. Request may have completed; do not retry automatically.");
+                    output.Write(buffer,0,read);
+                }
                 var text=Encoding.UTF8.GetString(output.ToArray());
-                if(!truncated) { try { var json=JsonNode.Parse(text); if(json is not null) text=Mask(json,plan.Secrets); } catch(JsonException){} }
+                try { var json=JsonNode.Parse(text); if(json is not null) text=Mask(json,plan.Secrets); } catch(JsonException){}
                 text=Redact(text,plan.Secrets);
-                if(text.Length>128000) {text=text[..128000];truncated=true;}
-                return new("completed",HttpStatus:(int)response.StatusCode,Body:text,Truncated:truncated,Message:"HTTP status is not an application-level success guarantee. Inspect response status/data. Redirects were not followed; no scripts/tests ran.");
+                return new("completed",HttpStatus:(int)response.StatusCode,Body:text,Truncated:false,Message:"HTTP status is not an application-level success guarantee. Inspect response status/data. Redirects were not followed; no scripts/tests ran.");
             }
             await _backups.SaveAsync(plan.Backup,token);
             var path="collections/"+current.ApiId;

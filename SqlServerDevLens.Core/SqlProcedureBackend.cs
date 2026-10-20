@@ -64,7 +64,7 @@ public sealed partial class SqlProcedureBackend(string database, Func<string> co
         await reader.NextResultAsync(token);
         while (await reader.ReadAsync(token))
         {
-            if (parameters.Count >= 100) throw new ArgumentException("At most 100 parameters are supported by this review workflow.");
+
             parameters.Add(new(reader.GetString(0), reader.GetString(1), reader.GetInt16(2), reader.GetByte(3), reader.GetByte(4), reader.GetBoolean(5), defaults.Contains(reader.GetString(0)), reader.GetBoolean(6), reader.GetBoolean(7)));
         }
         return new(schema, name, sql, revision, ansi, quoted, parameters);
@@ -99,7 +99,7 @@ public sealed partial class SqlProcedureBackend(string database, Func<string> co
             var parameter = new SqlParameter(info.Name, type) { Precision = info.Precision, Scale = info.Scale,
                 Direction = info.Output ? ParameterDirection.InputOutput : ParameterDirection.Input };
             if (type is SqlDbType.VarChar or SqlDbType.NVarChar or SqlDbType.Char or SqlDbType.NChar)
-                parameter.Size = info.Output && (size == -1 || size > 20000) ? 20000 : size;
+                parameter.Size = size;
             try
             {
                 parameter.Value = !suppliedValue || value.ValueKind == JsonValueKind.Null ? DBNull.Value : type switch
@@ -111,8 +111,8 @@ public sealed partial class SqlProcedureBackend(string database, Func<string> co
                     SqlDbType.DateTimeOffset => value.GetDateTimeOffset(), SqlDbType.Time => TimeSpan.ParseExact(value.GetString()!, "c", CultureInfo.InvariantCulture),
                     _ => value.GetString()!
                 };
-                if (parameter.Value is string text && ((size > 0 && text.Length > size) || text.Length > 20000))
-                    throw new ArgumentException($"Parameter {info.Name} exceeds its declared or 20,000-character limit.");
+                if (parameter.Value is string text && (size > 0 && text.Length > size))
+                    throw new ArgumentException($"Parameter {info.Name} exceeds its declared SQL parameter length.");
                 if (type == SqlDbType.Decimal && parameter.Value is decimal number &&
                     (decimal.Round(number, Math.Min(28, (int)info.Scale)) != number ||
                      decimal.Truncate(decimal.Abs(number)).ToString(CultureInfo.InvariantCulture).TrimStart('0').Length > info.Precision - info.Scale))
@@ -140,18 +140,18 @@ public sealed partial class SqlProcedureBackend(string database, Func<string> co
             command.CommandText = ProcedureSql.QuotedName(definition.Schema, definition.Name);
             foreach (var parameter in Bind(definition, parametersJson)) command.Parameters.Add(parameter);
             var returnCode = command.Parameters.Add("@__devlens_return_value", SqlDbType.Int); returnCode.Direction = ParameterDirection.ReturnValue;
-            var sets = new List<SqlResult>(); var rowsRemaining = 500; var characters = 0; var complete = true;
+            var sets = new List<SqlResult>(); var budget = new ResultReadBudget();
             await using (var reader = await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct))
             {
                 do
                 {
                     if (reader.FieldCount == 0) continue;
-                    if (sets.Count >= 10 || reader.FieldCount > 100) { complete = false; break; }
+                    budget.Add(256 + reader.FieldCount * 64);
                     var columns = Enumerable.Range(0, reader.FieldCount).Select(i => new SqlColumn(reader.GetName(i), reader.GetDataTypeName(i))).ToArray();
-                    var rows = new List<object?[]>(); var valuesTruncated = false; var truncated = false;
+                    var rows = new List<object?[]>(); var valuesTruncated = false;
                     while (await reader.ReadAsync(ct))
                     {
-                        if (rowsRemaining == 0 || characters >= 200000) { truncated = true; complete = false; break; }
+                        budget.Add(64 + reader.FieldCount * 32);
                         var row = new object?[reader.FieldCount];
                         for (var i = 0; i < row.Length; i++)
                         {
@@ -159,34 +159,29 @@ public sealed partial class SqlProcedureBackend(string database, Func<string> co
                             var type = reader.GetDataTypeName(i).ToLowerInvariant();
                             if (type is "nvarchar" or "varchar" or "char" or "nchar" or "text" or "ntext")
                             {
-                                using var text = reader.GetTextReader(i); var buffer = new char[2001]; var count = 0;
-                                while (count < buffer.Length) { var n = await text.ReadAsync(buffer.AsMemory(count), ct); if (n == 0) break; count += n; }
-                                row[i] = new string(buffer, 0, Math.Min(count, 2000)); valuesTruncated |= count > 2000;
+                                using var text = reader.GetTextReader(i);
+                                row[i] = await budget.ReadTextAsync(text, ct);
                             }
                             else if (type is "binary" or "varbinary" or "image" or "timestamp" or "rowversion" or "xml" or "sql_variant" or "geography" or "geometry" or "hierarchyid")
                             { row[i] = "[complex/binary value omitted]"; valuesTruncated = true; }
                             else row[i] = Format(reader.GetValue(i));
-                            characters += Convert.ToString(row[i], CultureInfo.InvariantCulture)?.Length ?? 0;
+                            if (row[i] is not string) budget.Add(64);
                         }
-                        if (characters > 200000) { truncated = true; complete = false; break; }
-                        rows.Add(row); rowsRemaining--;
+                        rows.Add(row);
                     }
-                    sets.Add(new(Database, columns, rows, truncated, valuesTruncated));
-                    if (!complete) break;
+                    sets.Add(new(Database, columns, rows, false, valuesTruncated));
                 } while (await reader.NextResultAsync(ct));
-                if (!complete) command.Cancel();
+
             }
-            var output = new Dictionary<string, object?>(); var outputTruncated = false;
-            if (complete)
-                foreach (SqlParameter parameter in command.Parameters)
-                    if (parameter.Direction == ParameterDirection.InputOutput)
-                    {
-                        output[parameter.ParameterName] = Format(parameter.Value);
-                        outputTruncated |= parameter.Value is string text && text.Length > 2000;
-                        outputTruncated |= definition.Parameters.Any(p => p.Name == parameter.ParameterName && (p.Size == -1 || p.Size > 20000));
-                    }
-            return new ProcedureExecution(sets, output, complete && returnCode.Value is int code ? code : null, complete,
-                complete ? "Execution finished. Output strings are bounded to 2000 characters." : "Result limit reached; remaining results were cancelled. Changes may already have committed. Do not retry automatically.", outputTruncated);
+            var output = new Dictionary<string, object?>();
+            foreach (SqlParameter parameter in command.Parameters)
+                if (parameter.Direction == ParameterDirection.InputOutput)
+                {
+                    output[parameter.ParameterName] = Format(parameter.Value);
+                    budget.Add(Convert.ToString(output[parameter.ParameterName], CultureInfo.InvariantCulture)?.Length ?? 0);
+                }
+            return new ProcedureExecution(sets, output, returnCode.Value is int code ? code : null, true,
+                "Execution finished. Full text results captured for paging; binary/complex omissions are marked by ValuesTruncated.");
         }
         finally { _actions.Release(); }
     }, token, mayWrite: true);
@@ -194,7 +189,7 @@ public sealed partial class SqlProcedureBackend(string database, Func<string> co
     {
         DBNull => null, DateTime date => date.ToString("O", CultureInfo.InvariantCulture), DateTimeOffset date => date.ToString("O", CultureInfo.InvariantCulture),
         byte or short or int or long or decimal or double or float or bool => value,
-        _ => Convert.ToString(value, CultureInfo.InvariantCulture) is { } text ? text[..Math.Min(text.Length, 2000)] : null
+        _ => Convert.ToString(value, CultureInfo.InvariantCulture) is { } text ? text : null
     };
     public Task<ProcedureApplyResult> ApplyAsync(string schema, string name, string sql, ProcedureDefinition? previous, CancellationToken token) => Safe(async ct =>
     {

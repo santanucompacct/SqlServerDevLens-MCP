@@ -1,5 +1,15 @@
 # Release notes
 
+## 0.12.0 candidate - Large returns and session authorization (2026-10-20)
+
+- Remove procedure text/output clipping and the old row/set/column/value execution cutoffs. Capture one completed execution in desktop-session memory and page immutable JSON through read_result_page; release_result frees it. Large SELECT/table text and masked Postman responses use the same capture path. No re-execution to fetch pages.
+- Remove the 20K MAX parameter binding/output-size cap and raise scalar parameter JSON to a 1,000,000-character transport budget; declared SQL types/sizes still apply.
+- Add ten separate operator-controlled authorization checkboxes, off by default, scoped to the current session and reset on Stop/restart. Automatic grants are revocable before consumption and cannot be enabled by MCP tools. Manual review remains default.
+- Support scoped transactional DELETE with WHERE, schema/row-count rechecks, SQL permissions and the existing 500 direct-row guard. No DROP/TRUNCATE or unrestricted DELETE.
+- Document retained memory/page/time/input/platform limits and unknown-outcome handling. Capture failures do not prove rollback. New synthetic, stdio, disposable SQL and Postman simulation tests cover the new boundaries; production report reruns require the rebuilt app and user authorization.
+- Candidate adapter/plugin version 0.12.0 exposes 27 tools. Both desktop and adapter must be updated; stable release links/checksums are not changed by this source commit.
+
+
 ## Unreleased - Secure MCP Tunnel and one-click setup (2026-10-19)
 
 - Include the tunnel implementation on master, with a separate Windows packaging workflow. Standard v* release automation and the existing v0.11.0 local-plugin download remain unchanged. No new tunnel release is implied by a source merge.

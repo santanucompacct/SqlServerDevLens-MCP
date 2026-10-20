@@ -19,7 +19,7 @@ try {
         'published_app/coreclr.dll','published_mcp/coreclr.dll','Tunnel/tunnel-client.exe','Tunnel/cloudflared.exe',
         'Tunnel/LICENSE','Tunnel/NOTICE','Tunnel/Configure-Tunnel.ps1','Tunnel/Start-Tunnel.ps1','Tunnel/Start-All.ps1','Tunnel/launcher.example.ini','Start-All.cmd',
         'Tunnel/QUICKSTART.md','Tunnel/DOWNLOAD-VALIDATION.md','Tunnel/images/tunnel-setup.png','Tunnel/images/tunnel-running.png',
-        'Configure-Tunnel.cmd','Start-Tunnel.cmd','Start-DevLens.cmd','TUNNEL_SETUP_AND_RELEASE.md','BUILD-INFO.json',
+        'Configure-Tunnel.cmd','Start-Tunnel.cmd','Start-DevLens.cmd','TUNNEL_SETUP_AND_RELEASE.md','RESULTS-AND-AUTHORIZATION.md','BUILD-INFO.json',
         'Install-Plugin.cmd','Setup-Plugin.ps1','.agents/plugins/marketplace.json','licenses/dependencies.json',
         'plugins/sql-server-devlens/skills/devlens-workflow/SKILL.md',
         'plugins/sql-server-devlens/skills/devlens-workflow/agents/openai.yaml',

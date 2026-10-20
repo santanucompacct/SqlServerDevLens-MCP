@@ -10,10 +10,10 @@ public sealed record ProcedureParameterInfo(string Name, string Type, int Size, 
 public sealed record ProcedureDefinition(string Schema, string Name, string Definition, string Revision,
     bool AnsiNulls, bool QuotedIdentifier, IReadOnlyList<ProcedureParameterInfo> Parameters);
 public sealed record ProcedureExecution(IReadOnlyList<SqlResult> ResultSets, IReadOnlyDictionary<string, object?> OutputParameters,
-    int? ReturnCode, bool Completed, string Message, bool OutputValuesTruncated = false);
+    int? ReturnCode, bool Completed, string Message, bool OutputValuesTruncated = false, CapturedResultReference? Capture = null, bool ReadCapturedResult = false);
 public sealed record ProcedureReview(string RequestId, string Database, string Schema, string Name, string Action,
     string Before, string Proposed, string Diff, string Parameters, DateTimeOffset ExpiresAt, string TargetKind = "procedure");
-public sealed record ProcedureRequestStatus(string RequestId, string Status, DateTimeOffset ExpiresAt, string Diff);
+public sealed record ProcedureRequestStatus(string RequestId, string Status, DateTimeOffset ExpiresAt, string Diff, string Authorization = "manual");
 public sealed record ProcedureApplyResult(string Status, bool BackupSaved);
 
 public interface IProcedureBackend
@@ -25,10 +25,12 @@ public interface IProcedureBackend
     Task<ProcedureApplyResult> ApplyAsync(string schema, string name, string sql, ProcedureDefinition? previous, CancellationToken token);
 }
 
-// Decisions come only from the desktop callback; no MCP tool can set approved=true.
+// Decisions come only from desktop review or its operator-enabled session policy; no MCP setter grants permission.
 public sealed class ProcedureWorkflow(IProcedureBackend backend,
-    Action<ProcedureReview, Action<bool>, CancellationToken>? review = null, TimeProvider? clock = null) : IDisposable
+    Action<ProcedureReview, Action<bool>, CancellationToken>? review = null, TimeProvider? clock = null,
+    SessionAuthorization? authorization = null, CapturedResults? results = null) : IDisposable
 {
+    public CapturedResults Results { get; } = results ?? new(clock);
     private readonly TimeProvider _clock = clock ?? TimeProvider.System;
     private readonly CancellationTokenSource _stopped = new();
     private readonly object _gate = new();
@@ -41,6 +43,7 @@ public sealed class ProcedureWorkflow(IProcedureBackend backend,
         public string Parameters { get; } = parameters;
         public string Status { get; set; } = "pending";
         public TableSqlSnapshot? Table { get; } = table;
+        public long? AutomaticGrant { get; set; }
     }
     public async Task<ProcedureDefinition> ReadAsync(string schema, string name, CancellationToken token)
     {
@@ -82,7 +85,7 @@ public sealed class ProcedureWorkflow(IProcedureBackend backend,
     private ProcedureRequestStatus Stage(string schema, string name, string action, ProcedureDefinition? previous, string sql, string parameters, TableSqlSnapshot? table = null)
     {
         _stopped.Token.ThrowIfCancellationRequested();
-        if (review is null) throw new InvalidOperationException("Desktop approval is unavailable. No procedure action was prepared or executed.");
+        if (review is null && authorization is null) throw new InvalidOperationException("Desktop approval is unavailable. No procedure action was prepared or executed.");
         var id = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
         var expires = _clock.GetUtcNow().AddMinutes(5);
         var before = table?.Metadata ?? previous?.Definition ?? "";
@@ -99,8 +102,17 @@ public sealed class ProcedureWorkflow(IProcedureBackend backend,
             if (_pending.Count >= 5) throw new InvalidOperationException("Too many pending requests. Complete them or wait for expiry.");
             _pending.Add(id, pending);
         }
+        var category = SessionAuthorization.Category(request);
+        pending.AutomaticGrant = authorization?.Grant(category);
+        if (pending.AutomaticGrant is not null)
+        {
+            lock (_gate) pending.Status = "approved";
+            authorization!.RecordUse(category);
+            return Status(id);
+        }
         try
         {
+            if (review is null) throw new InvalidOperationException("Manual desktop review is unavailable.");
             review(request, approved =>
             {
                 lock (_gate)
@@ -116,7 +128,7 @@ public sealed class ProcedureWorkflow(IProcedureBackend backend,
         lock (_gate)
         {
             var pending = Find(requestId);
-            return new(requestId, pending.Status, pending.Review.ExpiresAt, pending.Review.Diff);
+            return new(requestId, pending.Status, pending.Review.ExpiresAt, pending.Review.Diff, pending.AutomaticGrant is null ? "manual" : "session_policy");
         }
     }
     private Pending Find(string id)
@@ -134,15 +146,22 @@ public sealed class ProcedureWorkflow(IProcedureBackend backend,
                 _ => pending.Table is not null || pending.Review.Action is not ("create" or "alter") })
                 throw new ArgumentException("Request belongs to a different action.");
             if (pending.Status != "approved") throw new InvalidOperationException("Explicit approval in DevLens is required. The action has not run.");
+            if (pending.AutomaticGrant is long grant) authorization!.Check(SessionAuthorization.Category(pending.Review), grant);
             _pending.Remove(id); // Consume before any SQL; a failure must never be replayed.
             return pending;
         }
     }
     public async Task<ProcedureExecution> ExecuteAsync(string id, CancellationToken token)
     {
+        lock (_gate) _ = Find(id);
+        using var capture = Results.Reserve();
         var pending = Consume(id, "execute");
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, _stopped.Token);
-        return await backend.ExecuteAsync(pending.Previous!, pending.Parameters, linked.Token);
+        var result = await backend.ExecuteAsync(pending.Previous!, pending.Parameters, linked.Token);
+        var reference = capture.Save(result);
+        return reference.TotalCharacters <= CapturedResults.InlineCharacters ? result with { Capture = reference }
+            : result with { ResultSets = [], OutputParameters = new Dictionary<string, object?>(), Capture = reference, ReadCapturedResult = true,
+                Message = "Execution finished once. Full result sets, text values, output parameters and return code are captured. Read all read_result_page pages using Capture.ResultId; do not execute again to fetch data." };
     }
     public async Task<ProcedureApplyResult> ApplyAsync(string id, CancellationToken token)
     {
@@ -156,7 +175,7 @@ public sealed class ProcedureWorkflow(IProcedureBackend backend,
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, _stopped.Token);
         return await ((ITableActionBackend)backend).ApplyTableAsync(pending.Table!, linked.Token);
     }
-    public void Dispose() { _stopped.Cancel(); lock (_gate) _pending.Clear(); }
+    public void Dispose() { _stopped.Cancel(); lock (_gate) _pending.Clear(); Results.Dispose(); }
 }
 
 public static class ProcedureSql
@@ -203,7 +222,7 @@ public static class ProcedureSql
     }
     public static Dictionary<string, JsonElement> Parameters(string json)
     {
-        if (json.Length > 64000) throw new ArgumentException("Parameter JSON exceeds 64,000 characters.");
+        if (json.Length > 1000000) throw new ArgumentException("Parameter JSON exceeds the 1,000,000-character transport budget.");
         try
         {
             using var document = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 4 });

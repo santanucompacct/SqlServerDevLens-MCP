@@ -18,10 +18,10 @@ try {
     $null=Request 1 'initialize' @{protocolVersion='2025-11-25';capabilities=@{};clientInfo=@{name='tunnel-package-test';version='1.0'}}
     $child.StandardInput.WriteLine('{"jsonrpc":"2.0","method":"notifications/initialized"}')
     $tools=Request 2 'tools/list' @{}
-    if ($tools.tools.Count -ne 25 -or 'read_table_page' -notin $tools.tools.name -or 'get_table_schema' -notin $tools.tools.name) { throw 'Expected tunnel adapter tool schemas missing.' }
+    if ($tools.tools.Count -ne 27 -or 'read_table_page' -notin $tools.tools.name -or 'get_table_schema' -notin $tools.tools.name -or 'read_result_page' -notin $tools.tools.name -or 'release_result' -notin $tools.tools.name) { throw 'Expected tunnel adapter tool schemas missing.' }
     $result=Request 3 'tools/call' @{name='get_server_status';arguments=@{}}
     if ($result.isError -or ($result.content[0].text|ConvertFrom-Json).status -ne 'desktop_unavailable') { throw 'Isolated adapter status failed.' }
-    Write-Host 'PASS: desktop-mode initialize, 25 tools including table paging, isolated unavailable status. No live pipe was used.'
+    Write-Host 'PASS: desktop-mode initialize, 27 tools including table paging, isolated unavailable status. No live pipe was used.'
 } finally {
     $child.StandardInput.Close()
     if (-not $child.WaitForExit(5000)) { $child.Kill($true); $child.WaitForExit() }

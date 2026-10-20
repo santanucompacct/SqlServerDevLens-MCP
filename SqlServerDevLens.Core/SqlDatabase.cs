@@ -6,7 +6,7 @@ namespace SqlServerDevLens.Core;
 
 public sealed record SqlColumn(string Name, string Type);
 public sealed record SqlResult(string Database, IReadOnlyList<SqlColumn> Columns, IReadOnlyList<object?[]> Rows,
-    bool Truncated, bool ValuesTruncated);
+    bool Truncated, bool ValuesTruncated, CapturedResultReference? Capture = null, bool ReadCapturedResult = false);
 public sealed record TableDataPage(SqlResult Data, int Offset, int? NextOffset, IReadOnlyList<string> OrderColumns,
     string Consistency = "Live pages, not a snapshot. Concurrent row/key changes can cause skipped or repeated rows. ValuesTruncated applies to individual values.");
 
@@ -14,6 +14,8 @@ public interface ISqlDatabase : IDisposable
 {
     string Database { get; }
     ProcedureWorkflow? Procedures => null;
+    CapturedResults? Results => null;
+    SessionAuthorization? Authorization => null;
     Task<SqlResult> GetDatabaseInfoAsync(CancellationToken cancellationToken);
     Task<SqlResult> ListObjectsAsync(CancellationToken cancellationToken);
     Task<SqlResult> DescribeObjectAsync(string schema, string name, CancellationToken cancellationToken);
@@ -30,21 +32,23 @@ public sealed class SqlDatabase : ISqlDatabase
     private readonly SemaphoreSlim _operations = new(4, 4);
     public string Database { get; }
     public ProcedureWorkflow Procedures { get; }
+    public CapturedResults Results { get; } = new();
+    public SessionAuthorization? Authorization { get; }
     public SqlDatabase(ConnectionProfile profile, string? password,
-        Action<ProcedureReview, Action<bool>, CancellationToken>? review = null)
+        Action<ProcedureReview, Action<bool>, CancellationToken>? review = null, SessionAuthorization? authorization = null)
     {
-        Database = profile.Database.Trim();
+        Database = profile.Database.Trim(); Authorization = authorization;
         var builder = new SqlConnectionStringBuilder(SqlConnectionTester.BuildConnectionString(profile, password))
         { Pooling = false, ApplicationIntent = ApplicationIntent.ReadOnly };
         _connectionString = builder.ConnectionString;
         Procedures = new ProcedureWorkflow(new SqlProcedureBackend(Database,
-            () => _connectionString ?? throw new InvalidOperationException("SQL context is stopped.")), review);
+            () => _connectionString ?? throw new InvalidOperationException("SQL context is stopped.")), review, authorization: authorization, results: Results);
     }
     public void Dispose()
     {
         Interlocked.Exchange(ref _connectionString, null);
         _stopped.Cancel();
-        Procedures.Dispose();
+        Procedures.Dispose(); Authorization?.Reset();
     }
 
     public Task<SqlResult> GetDatabaseInfoAsync(CancellationToken cancellationToken) => ExecuteAsync(
@@ -143,10 +147,11 @@ public sealed class SqlDatabase : ISqlDatabase
             if (reader.FieldCount > 100) throw new ArgumentException("Result has more than 100 columns. Select fewer columns.");
             var columns = Enumerable.Range(0, reader.FieldCount).Select(i => new SqlColumn(reader.GetName(i), reader.GetDataTypeName(i))).ToArray();
             var rows = new List<object?[]>();
-            var valuesTruncated = false; var truncated = false; var characters = 0;
+            var valuesTruncated = false; var truncated = false; var budget = new ResultReadBudget();
             while (await reader.ReadAsync(timeout.Token).ConfigureAwait(false))
             {
-                if (rows.Count == maxRows || characters >= 200000) { truncated = true; break; }
+                if (rows.Count == maxRows) { truncated = true; break; }
+                budget.Add(64 + reader.FieldCount * 32);
                 var row = new object?[reader.FieldCount];
                 for (var i = 0; i < row.Length; i++)
                 {
@@ -157,14 +162,7 @@ public sealed class SqlDatabase : ISqlDatabase
                     else if (type is "varchar" or "nvarchar" or "char" or "nchar" or "text" or "ntext")
                     {
                         using var text = reader.GetTextReader(i);
-                        var buffer = new char[2001]; var count = 0;
-                        while (count < buffer.Length)
-                        {
-                            var read = await text.ReadAsync(buffer.AsMemory(count), timeout.Token).ConfigureAwait(false);
-                            if (read == 0) break; count += read;
-                        }
-                        row[i] = new string(buffer, 0, Math.Min(count, 2000));
-                        if (count > 2000) valuesTruncated = true;
+                        row[i] = await budget.ReadTextAsync(text, timeout.Token);
                     }
                     else if (type is "xml" or "geography" or "geometry" or "hierarchyid" or "sql_variant")
                     { row[i] = "[complex value omitted]"; valuesTruncated = true; }
@@ -179,9 +177,8 @@ public sealed class SqlDatabase : ISqlDatabase
                             _ => Convert.ToString(value, CultureInfo.InvariantCulture)
                         };
                     }
-                    characters += Convert.ToString(row[i], CultureInfo.InvariantCulture)?.Length ?? 0;
+                    if (row[i] is not string) budget.Add(64);
                 }
-                if (characters > 200000) { truncated = true; break; }
                 rows.Add(row);
             }
             return new(Database, columns, rows, truncated, valuesTruncated);
