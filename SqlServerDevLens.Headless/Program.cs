@@ -21,28 +21,46 @@ try
     var config = InstanceConfiguration.Load(args[1]);
     stage = "credential";
     var password = InstanceConfiguration.ReadPassword(config.InstanceId);
+    stage = "configuration-policy";
+    var settings = args[0] == "--check" ? new OperatorSettings("read-only", null, null, null)
+        : OperatorSettings.Load(config.InstanceId);
+    var authorization = settings.NewAuthorization();
     stage = "sql-context";
-    using var database = new SqlDatabase(config.Profile(), password);
-    if (args[0] == "--serve")
-    {
-        Console.Error.WriteLine($"Instance {config.InstanceId}: private read-only runtime starting.");
-        stage = "runtime-socket";
-        await UnixRuntime.ServeAsync(args[3], ReadOnlyCatalog.Create(config, database), stop.Token);
-        return 0;
-    }
+    using var database = new SqlDatabase(config.Profile(), password,
+        authorization: settings.Mode == "full" ? authorization : null);
     if (args[0] == "--check")
     {
         await database.GetDatabaseInfoAsync(stop.Token);
         Console.Error.WriteLine($"Instance {config.InstanceId}: SQL metadata check succeeded.");
         return 0;
     }
-    // stdout is exclusively MCP; the runtime has no desktop pipe, listener or approval endpoint.
-    await using var server = McpServer.Create(new StreamServerTransport(Console.OpenStandardInput(), Console.OpenStandardOutput()),
-        new McpServerOptions { ToolCollection = [..ReadOnlyCatalog.Create(config, database)] });
-    Console.Error.WriteLine($"Instance {config.InstanceId}: read-only stdio runtime started.");
-    try { await server.RunAsync(stop.Token); }
-    catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
-    return 0;
+    stage = "postman-configuration";
+    var (selection, postmanWorkflow) = await settings.SetupPostmanAsync(
+        config.InstanceId, authorization, database.Results, stop.Token);
+    using var workflow = postmanWorkflow;
+    var tools = settings.CreateTools(config, database, authorization, selection, workflow);
+    using var expiryStop = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
+    var expiryTask = settings.Mode == "full"
+        ? OperatorSettings.ExpireAsync(authorization, settings.AutomaticUntilUtc, expiryStop.Token)
+        : Task.CompletedTask;
+    try
+    {
+        if (args[0] == "--serve")
+        {
+            Console.Error.WriteLine($"Instance {config.InstanceId}: {settings.Mode} runtime starting.");
+            stage = "runtime-socket";
+            await UnixRuntime.ServeAsync(args[3], tools, stop.Token);
+            return 0;
+        }
+        // stdout is exclusively MCP; the runtime has no public listener or desktop dependency.
+        await using var server = McpServer.Create(new StreamServerTransport(Console.OpenStandardInput(), Console.OpenStandardOutput()),
+            new McpServerOptions { ToolCollection = tools });
+        Console.Error.WriteLine($"Instance {config.InstanceId}: {settings.Mode} stdio runtime started.");
+        try { await server.RunAsync(stop.Token); }
+        catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
+        return 0;
+    }
+    finally { expiryStop.Cancel(); await expiryTask; }
 }
 catch (Exception error)
 {
