@@ -15,6 +15,12 @@ done
 systemctl daemon-reload
 for instance in ci-alpha ci-beta; do
   bash /opt/devlens/linux/enable-instance.sh "$instance"
+  ready=false
+  for ((attempt=0;attempt<60;attempt++)); do
+    if systemctl is-active --quiet "devlens@$instance" && systemctl is-active --quiet "devlens-tunnel@$instance"; then ready=true; break; fi
+    sleep 1
+  done
+  [[ $ready == true ]]
   systemctl is-enabled --quiet "devlens@$instance" "devlens-tunnel@$instance"
   systemctl is-active --quiet "devlens@$instance" "devlens-tunnel@$instance"
   [[ -S /run/devlens-$instance/mcp.sock ]]
@@ -22,6 +28,7 @@ done
 # Crash either process independently; wait for automatic restart without logging into its user.
 for service in devlens@ci-alpha devlens-tunnel@ci-alpha; do
   before=$(systemctl show -p MainPID --value "$service")
+  [[ $before =~ ^[0-9]+$ && $before -gt 1 ]]
   kill -KILL "$before"
   recovered=false
   for ((attempt=0;attempt<60;attempt++)); do
@@ -36,7 +43,7 @@ for instance in ci-alpha ci-beta; do
   ! systemctl is-active --quiet "devlens-tunnel@$instance"
   [[ ! -e /run/devlens-$instance/mcp.sock ]]
   [[ -f /etc/devlens/$instance/sql-password && -f /etc/devlens/$instance/instance.json ]]
-  systemctl start "devlens@$instance" "devlens-tunnel@$instance"
+  timeout 120 systemctl start "devlens@$instance" "devlens-tunnel@$instance"
   systemctl is-active --quiet "devlens@$instance" "devlens-tunnel@$instance"
   systemctl disable --now "devlens@$instance" "devlens-tunnel@$instance"
 done

@@ -12,5 +12,5 @@ done
 [[ $(stat -c '%u:%a' "/etc/devlens/$instance") == '0:750' ]] || exit 1
 [[ -f /etc/devlens/$instance/dashboard-port ]] || exit 1
 systemctl enable "devlens@$instance.service" "devlens-tunnel@$instance.service"
-systemctl start "devlens@$instance.service" "devlens-tunnel@$instance.service"
+systemctl start --no-block "devlens@$instance.service" "devlens-tunnel@$instance.service"
 echo 'Enabled both services for unattended boot. Run sudo devlens-health to verify live SQL and tunnel polling.'

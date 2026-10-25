@@ -6,6 +6,32 @@ namespace SqlServerDevLens.Headless.Tests;
 
 public sealed class IsolationTests
 {
+    [Fact]
+    public void CredentialReadAcceptsOnlyPrivateFilesAndRejectsWorldReadableSecrets()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "credential-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "sql-password");
+        var previous = Environment.GetEnvironmentVariable("CREDENTIALS_DIRECTORY");
+        try
+        {
+            if (OperatingSystem.IsLinux()) File.SetUnixFileMode(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            File.WriteAllText(path, "synthetic-only\n");
+            if (OperatingSystem.IsLinux()) File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.GroupRead);
+            Environment.SetEnvironmentVariable("CREDENTIALS_DIRECTORY", directory);
+            Assert.Equal("synthetic-only", InstanceConfiguration.ReadPassword());
+            if (OperatingSystem.IsLinux())
+            {
+                File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.OtherRead);
+                Assert.Throws<ArgumentException>(() => InstanceConfiguration.ReadPassword());
+            }
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("CREDENTIALS_DIRECTORY", previous);
+            File.Delete(path); Directory.Delete(directory);
+        }
+    }
     private static InstanceConfiguration Config(string id, string db) => new(id, "localhost", 1433, db, "reader");
     [Fact]
     public void TwoCatalogsOnlyExposeTheTenReadToolsAndKeepCapturesSeparate()
