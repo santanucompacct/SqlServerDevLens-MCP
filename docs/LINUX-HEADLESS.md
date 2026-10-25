@@ -1,5 +1,6 @@
 # Linux headless read-only milestone (separate build)
 
+> **New experimental option:** This branch now also includes a Linux-only full SQL + Postman operator mode and a single localhost web portal with per-instance settings. The original ten-tool read-only mode remains the default. See [LINUX-ADMIN-PORTAL.md](LINUX-ADMIN-PORTAL.md). Manual remote approval is not yet available in headless mode; only categories activated in the private operator portal can automatically execute staged sensitive operations, and those category grants expire. Validate on disposable SQL/Postman data first. The Windows desktop and workflows are unchanged.\n\n
 Target: Ubuntu Server 24.04 LTS, Linux x64. Experimental branch `feature/linux-headless-multi-instance`; review before deployment. This is an additional executable in the existing repository, not a replacement for Windows. The Windows solution, desktop, adapter, plugin manifests, vendor locks, installers and release workflows are unchanged. No VPS or production database is configured by the build.
 
 ## Architecture
