@@ -31,11 +31,33 @@ static string Page(string title, string body) => "<!DOCTYPE html><html lang='en'
     "label{display:block;font-weight:600;margin:12px 0}input,select{display:block;width:100%;max-width:470px;box-sizing:border-box;padding:10px;margin-top:5px;border:1px solid #a5b3c2;border-radius:7px}"+
     "input[type=checkbox]{display:inline;width:auto;margin-right:8px}button{background:#155eab;color:#fff;border:0;padding:10px 15px;border-radius:7px;cursor:pointer;margin:6px 6px 6px 0}"+
     "a{color:#1263b3}nav a{margin-right:20px}.muted{color:#54657b}.error{color:#a33}.pill{background:#e8eef7;border-radius:7px;padding:6px}"+
-    "h1,h2,h3{margin:0 0 13px}code{font-size:13px}</style></head><body><header><strong>SQL Server DevLens · Linux Admin</strong>"+
+    " .good{font-weight:800;color:#137333}.bad{font-weight:800;color:#b42318}.pending{font-weight:800;color:#9a6700}.secret-panel{padding:12px 0;border-bottom:1px solid #dbe1eb}h1,h2,h3{margin:0 0 13px}code{font-size:13px}</style></head><body><header><strong>SQL Server DevLens · Linux Admin</strong>"+
     "</header><main><nav><a href='/'>All instances</a><a href='/new'>Add instance</a><a href='/logout'>Sign out</a></nav><hr>" +
     "<h1>" + E(title) + "</h1>" + body + "<p class='muted'>This portal is designed for SSH forwarding on localhost only. Never expose port 8090 on the internet.</p></main></body></html>";
 static IResult Problem(string message) => Html(Page("Operation could not complete", "<article class='error'><p>"+E(message)+"</p><p><a href='/'>Return to dashboard</a></p></article>"));
 static string Link(string instance) => "/instance/" + Uri.EscapeDataString(instance);
+static string State(string status, bool boot = false)
+{
+    var good = boot ? status == "enabled" : status == "active";
+    var pending = !boot && (status == "activating" || status == "deactivating");
+    return "<strong class='" + (good ? "good" : pending ? "pending" : "bad") + "'>" +
+        E(boot ? (good ? "Enabled" : "Disabled") :
+            status == "active" ? "Running" : status == "inactive" ? "Stopped" : status == "failed" ? "Failed" : status) + "</strong>";
+}
+static string SecretPanel(string instance, string csrf, string kind, string title, string? external = null)
+{
+    var saved = PortalStorage.HasSecret(instance, kind);
+    var link = external is null ? "" :
+        "<p><a href='" + E(external) + "' target='_blank' rel='noopener noreferrer'>Create " +
+        E(kind == "tunnel-key" ? "OpenAI API Key" : "Postman API Key") + "</a></p>";
+    return "<div class='secret-panel'><h3>" + E(title) + "</h3>" +
+        F(Link(instance)+"/secret",csrf,
+            "<input type='hidden' name='kind' value='"+E(kind)+"'>"+
+            Input("value","New "+title+" (existing value is never shown)","","password",true)+
+            "<button>Save "+E(title)+"</button>") +
+        "<p>Status: <strong class='" + (saved?"good":"bad") + "'>" +
+        (saved?"Saved":"Missing — required")+"</strong></p>"+link+"</div>";
+}
 bool SignedIn(HttpContext c)
 {
     if (!c.Request.Cookies.TryGetValue("devlens-session", out var supplied) || supplied is null) return false;
@@ -94,6 +116,7 @@ app.MapGet("/", () =>
 app.MapGet("/new", () => Html(Page("Add instance", "<article>"+
     F("/new", csrf, Input("name", "Instance name (lowercase, no spaces)", "", "text", true)+
     Input("tunnel", "Existing tunnel ID (tunnel_...)", "", "text", true)+
+    "<p><a target='_blank' rel='noopener noreferrer' href='https://platform.openai.com/settings/organization/tunnels'>Create OpenAI Tunnel</a></p>"+
     Input("port", "Local dashboard port", "8080", "number", true)+
     "<button>Create instance</button>")+"</article>")));
 app.MapPost("/new", async (HttpContext c) =>
@@ -117,10 +140,9 @@ app.MapGet("/instance/{name}", (string name) =>
             "<label><input type='checkbox' name='trust' value='yes' "+(d.TrustServerCertificate?"checked":"")+">Trust server certificate (skip certificate validation)</label>"+
             "<p class='muted'>Skipping certificate validation weakens server identity verification. For trusted development SQL servers only.</p>"+
             "<button>Save SQL connection</button>");
-        var secretForm=F(Link(name)+"/secret",csrf,
-            "<label>Credential type<select name='kind'><option value='sql-password'>SQL password</option>"+
-            "<option value='tunnel-key'>OpenAI tunnel key</option><option value='postman-key'>Postman API key</option></select></label>"+
-            Input("value","New credential (existing value is never shown)","","password",true)+"<button>Save credential</button>");
+        var secretForm=SecretPanel(name,csrf,"sql-password","SQL Password")+
+            SecretPanel(name,csrf,"tunnel-key","OpenAI Tunnel Key","https://platform.openai.com/api-keys")+
+            SecretPanel(name,csrf,"postman-key","Postman API Key","https://go.postman.co/settings/me/api-keys");
         var checks=string.Join("",SessionAuthorization.Categories.Select(category =>
             "<label><input type='checkbox' name='category' value='"+E(category)+"' "+
             ((op.AutomaticCategories??[]).Contains(category) ? "checked " : "")+">"+E(category)+"</label>"));
@@ -134,21 +156,23 @@ app.MapGet("/instance/{name}", (string name) =>
         var sqlCheckForm=F(Link(name)+"/sql-check",csrf,"<button>Test SQL connection</button>");
         var runtimeState=PortalStorage.UnitState(name,false);
         var tunnelState=PortalStorage.UnitState(name,true);
+        var bootState=PortalStorage.BootState(name);
         var serviceForm=F(Link(name)+"/service",csrf,
             "<button name='action' value='enable'>Enable boot services</button>"+
             "<button name='action' value='start'>Start</button><button name='action' value='restart'>Restart</button>"+
             "<button name='action' value='stop'>Stop</button>");
         return Html(Page("Configure "+name,
             "<p class='muted'>SQL and Postman settings apply after restarting this instance. Dashboard and tunnel are isolated.</p>"+
-            "<div class='grid'><section><h2>SQL Connection</h2>"+form+sqlCheckForm+"</section>"+
-            "<section><h2>Protected Credentials</h2>"+secretForm+
-            "<p>SQL secret: "+(PortalStorage.HasSecret(name,"sql-password")?"set":"missing")+
-            " · Tunnel key: "+(PortalStorage.HasSecret(name,"tunnel-key")?"set":"missing")+
-            " · Postman key: "+(PortalStorage.HasSecret(name,"postman-key")?"set":"missing")+"</p></section>"+
+            "<div class='grid'><section><h2>SQL Connection</h2>"+
+            (string.IsNullOrWhiteSpace(d.Host)||string.IsNullOrWhiteSpace(d.Database)||string.IsNullOrWhiteSpace(d.Username)?
+            "<p class='bad'>Required SQL connection details are missing.</p>":"")+
+            form+sqlCheckForm+"</section>"+
+            "<section><h2>Protected Credentials</h2>"+secretForm+"</section>"+
             "<section><h2>Authorization</h2>"+policyForm+"</section>"+
             "<section><h2>Postman</h2><p>"+(op.Postman is null?"No collection selected":E(op.Postman.CollectionId))+
             "</p><a href='"+Link(name)+"/postman'>Select workspace &amp; collection</a></section>"+
-            "<section><h2>Service</h2><p>SQL MCP runtime: <strong>"+E(runtimeState)+"</strong> · OpenAI tunnel: <strong>"+E(tunnelState)+"</strong></p>"+serviceForm+
+            "<section><h2>Service</h2><p>SQL MCP runtime: "+State(runtimeState)+"</p><p>OpenAI tunnel: "+State(tunnelState)+
+            "</p><p>Boot service: "+State(bootState,true)+"</p>"+serviceForm+
             "<p class='muted'>Enable once to start automatically whenever the Azure VM boots.</p></section></div>"));
     }
     catch { return Problem("Unknown instance or invalid private configuration."); }
@@ -156,7 +180,10 @@ app.MapGet("/instance/{name}", (string name) =>
 app.MapPost("/instance/{name}/db", async (string name,HttpContext c) =>
 {
     var f=await c.Request.ReadFormAsync();
-    if (!int.TryParse(f["port"].ToString(),out var port)) return Problem("Invalid SQL port.");
+    if (string.IsNullOrWhiteSpace(f["host"]) || string.IsNullOrWhiteSpace(f["database"]) ||
+        string.IsNullOrWhiteSpace(f["username"]) || !int.TryParse(f["port"].ToString(),out var port) ||
+        port is < 1 or > 65535)
+        return Problem("SQL connection requires valid host, port (1–65535), database and login.");
     try { PortalStorage.SaveDatabase(name,new(name,f["host"].ToString(),port,f["database"].ToString(),f["username"].ToString(),
             f["encrypt"].ToString()=="yes",f["trust"].ToString()=="yes")); return Results.Redirect(Link(name)); }
     catch (ArgumentException) { return Problem("Invalid SQL host, port, database or login."); }
@@ -172,6 +199,7 @@ app.MapPost("/instance/{name}/sql-check", (string name) =>
 app.MapPost("/instance/{name}/secret", async (string name,HttpContext c) =>
 {
     var f=await c.Request.ReadFormAsync();
+    if (string.IsNullOrWhiteSpace(f["value"].ToString())) return Problem("Credential is required before saving.");
     try { PortalStorage.SaveSecret(name,f["kind"].ToString(),f["value"].ToString()); return Results.Redirect(Link(name)); }
     catch { return Problem("Credential validation or secure storage failed."); }
 });
