@@ -54,7 +54,7 @@ try
         }
         // stdout is exclusively MCP; the runtime has no public listener or desktop dependency.
         await using var server = McpServer.Create(new StreamServerTransport(Console.OpenStandardInput(), Console.OpenStandardOutput()),
-            new McpServerOptions { ToolCollection = tools });
+            new McpServerOptions { ToolCollection = [..tools] });
         Console.Error.WriteLine($"Instance {config.InstanceId}: {settings.Mode} stdio runtime started.");
         try { await server.RunAsync(stop.Token); }
         catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
