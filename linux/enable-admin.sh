@@ -2,6 +2,7 @@
 # Run as root after installation. No password argument, shell history, or shared credentials.
 set -euo pipefail
 [[ $EUID == 0 ]] || exit 64
+install -d -o root -g root -m 0755 /etc/devlens
 install -d -o root -g root -m 0700 /etc/devlens-admin
 token=/etc/devlens-admin/admin-token
 if [[ ! -e $token ]]; then
