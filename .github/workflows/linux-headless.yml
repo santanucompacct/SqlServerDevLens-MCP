@@ -21,6 +21,8 @@ jobs:
       - name: Check private credential directories across Linux users
         run: sudo env DEVLENS_DISPOSABLE_CI=1 bash linux/os-isolation-smoke.sh
       - run: bash linux/build-package.sh
+      - name: Validate two offline instance profiles from the extracted package
+        run: sudo env DEVLENS_DISPOSABLE_CI=1 bash linux/provisioning-smoke.sh distribution/packages/linux-headless/SqlServerDevLens-linux-headless-0.1.0-linux-x64.tar.gz
       - name: Check service unit syntax
         run: |
           sudo cp linux/devlens@.service /run/systemd/system/
