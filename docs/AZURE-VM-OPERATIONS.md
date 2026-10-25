@@ -1,5 +1,6 @@
 # Azure Ubuntu VM: configure once, start from Portal
 
+> **New experimental option:** This branch now also includes a Linux-only full SQL + Postman operator mode and a single localhost web portal with per-instance settings. The original ten-tool read-only mode remains the default. See [LINUX-ADMIN-PORTAL.md](LINUX-ADMIN-PORTAL.md). Manual remote approval is not yet available in headless mode; only categories activated in the private operator portal can automatically execute staged sensitive operations, and those category grants expire. Validate on disposable SQL/Postman data first. The Windows desktop and workflows are unchanged.\n\n
 This is the experimental **Linux read-only** build, targeting Ubuntu 24.04 LTS x64. It changes no Windows functionality. There are two independent system services per instance: `devlens@NAME` owns SQL and captured results; `devlens-tunnel@NAME` owns the OpenAI tunnel and a stdio-to-Unix-socket bridge. No Linux login session is needed after initial setup. No execute, approval, mutation or Postman tools are enabled.
 
 ## 1. Prepare the VM and persistent storage
