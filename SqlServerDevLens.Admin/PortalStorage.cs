@@ -6,7 +6,7 @@ using SqlServerDevLens.Core;
 
 namespace SqlServerDevLens.Admin;
 
-public sealed record DbConfig(string InstanceId, string Host, int Port, string Database, string Username);
+public sealed record DbConfig(string InstanceId, string Host, int Port, string Database, string Username, bool EncryptConnection = true, bool TrustServerCertificate = false);
 public sealed record PostmanConfig(string WorkspaceId, string CollectionId);
 public sealed record OperatorConfig(string Mode, DateTimeOffset? AutomaticUntilUtc, string[] AutomaticCategories, PostmanConfig? Postman);
 public static class PortalStorage
@@ -136,6 +136,39 @@ public static class PortalStorage
             Run("/usr/bin/systemctl", "stop", "devlens-tunnel@" + name + ".service", "devlens@" + name + ".service");
         else
             Run("/usr/bin/systemctl", action, "devlens@" + name + ".service", "devlens-tunnel@" + name + ".service");
+    }
+    public static string SqlCheck(string name)
+    {
+        _ = Folder(name);
+        // Dedicated service name permits the runtime to verify named-user systemd credential ACLs.
+        var unit = "devlens-sqlcheck-" + name;
+        try
+        {
+            Run("/usr/bin/systemd-run", "--wait", "--pipe", "--collect", "--unit=" + unit,
+                "--property=User=devlens-" + name,
+                "--property=Group=devlens-" + name,
+                "--property=LoadCredential=sql-password:/etc/devlens/" + name + "/sql-password",
+                "/opt/devlens/app/SqlServerDevLens.Headless",
+                "--check", "/etc/devlens/" + name + "/instance.json");
+            return "SQL connection verified successfully.";
+        }
+        catch (Exception)
+        {
+            return "SQL test failed. Check hostname, database, login, TLS settings and SQL connectivity. See system journal for details.";
+        }
+    }
+    public static string UnitState(string name, bool tunnel)
+    {
+        _ = Folder(name);
+        var unit = (tunnel ? "devlens-tunnel@" : "devlens@") + name + ".service";
+        var psi = new ProcessStartInfo("/usr/bin/systemctl") { RedirectStandardOutput = true,
+            RedirectStandardError = true, UseShellExecute = false };
+        psi.ArgumentList.Add("is-active");
+        psi.ArgumentList.Add(unit);
+        using var process = Process.Start(psi) ?? throw new InvalidOperationException("Could not check service");
+        var output = process.StandardOutput.ReadToEnd().Trim();
+        process.WaitForExit(5000);
+        return output is "active" or "inactive" or "failed" or "activating" or "deactivating" ? output : "unavailable";
     }
     public static string ServiceStatus(string name)
     {
