@@ -6,14 +6,14 @@ using SqlServerDevLens.Core;
 namespace SqlServerDevLens.Headless;
 
 // No secret, authentication override, connection string or authorization flags in this DTO.
-public sealed record InstanceConfiguration(string InstanceId, string Host, int Port, string Database, string Username)
+public sealed record InstanceConfiguration(string InstanceId, string Host, int Port, string Database, string Username, bool EncryptConnection = true, bool TrustServerCertificate = false)
 {
     public ConnectionProfile Profile()
     {
         if (!Regex.IsMatch(InstanceId ?? "", "^[a-z][a-z0-9-]{0,31}$") ||
             string.IsNullOrWhiteSpace(Database) || Database != Database.Trim() ||
             Database.Any(char.IsControl)) throw new ArgumentException("Invalid instance identity or database.");
-        var profile = new ConnectionProfile(Host, Port, Database, AuthenticationMode.Sql, Username, true, false);
+        var profile = new ConnectionProfile(Host, Port, Database, AuthenticationMode.Sql, Username, EncryptConnection, TrustServerCertificate);
         profile.Validate();
         return profile;
     }
@@ -43,7 +43,8 @@ public sealed record InstanceConfiguration(string InstanceId, string Host, int P
                 UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute)) == 0;
         try { CheckPrivateFile(path, privateMount); }
         catch (ArgumentException) when (OperatingSystem.IsLinux() && expectedInstance is not null &&
-            directory == $"/run/credentials/devlens@{expectedInstance}.service" &&
+            (directory == $"/run/credentials/devlens@{expectedInstance}.service" ||
+             directory == $"/run/credentials/devlens-sqlcheck-{expectedInstance}.service") &&
             SystemdCredentialAcl.IsPrivate(directory, true) && SystemdCredentialAcl.IsPrivate(path, false))
         { /* systemd's named-user ACL mask is not a shared-group grant. */ }
         if (new FileInfo(path).Length > 4096) throw new ArgumentException("SQL credential exceeds 4 KiB.");
