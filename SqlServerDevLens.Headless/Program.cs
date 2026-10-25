@@ -27,7 +27,7 @@ try
     var authorization = settings.NewAuthorization();
     stage = "sql-context";
     using var database = new SqlDatabase(config.Profile(), password,
-        authorization: settings.Mode == "full" ? authorization : null);
+        authorization: settings.Mode != "read-only" ? authorization : null);
     if (args[0] == "--check")
     {
         await database.GetDatabaseInfoAsync(stop.Token);
@@ -40,7 +40,7 @@ try
     using var workflow = postmanWorkflow;
     var tools = settings.CreateTools(config, database, authorization, selection, workflow);
     using var expiryStop = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
-    var expiryTask = settings.Mode == "full"
+    var expiryTask = settings.Mode != "read-only"
         ? OperatorSettings.ExpireAsync(authorization, settings.AutomaticUntilUtc, expiryStop.Token)
         : Task.CompletedTask;
     try
