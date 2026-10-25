@@ -16,6 +16,7 @@ if [[ $client != "$package/tunnel/tunnel-client" ]]; then cp "$client" "$package
 chmod 0755 "$package/tunnel/tunnel-client" "$package/app/SqlServerDevLens.Headless"
 cp linux/configure-instance.sh linux/start-tunnel.sh linux/wait-runtime.sh linux/install-services.sh linux/enable-instance.sh linux/devlens-health.py linux/instance.example.json linux/devlens@.service linux/devlens-tunnel@.service "$package/linux/"
 cp docs/LINUX-HEADLESS.md "$package/README.md"
+cp docs/AZURE-VM-OPERATIONS.md "$package/AZURE-VM-OPERATIONS.md"
 cp LICENSE "$package/LICENSE" 2>/dev/null || cp LICENSE.txt "$package/LICENSE"
 dotnet list SqlServerDevLens.Headless/SqlServerDevLens.Headless.csproj package --include-transitive > "$package/DEPENDENCIES.txt"
 printf '{"product":"linux-headless-read-only","version":"0.1.0","commit":"%s","privateIdentityIncluded":false}\n' "$(git rev-parse HEAD)" > "$package/BUILD-INFO.json"

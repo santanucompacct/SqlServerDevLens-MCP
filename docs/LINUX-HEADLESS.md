@@ -4,15 +4,15 @@ Target: Ubuntu Server 24.04 LTS, Linux x64. Experimental branch `feature/linux-h
 
 ## Architecture
 
-`ChatGPT connection A -> tunnel A -> stdio Headless process A -> database A`
+`ChatGPT connection A -> devlens-tunnel@A (stdio bridge) -> private Unix socket -> devlens@A -> database A`
 
-`ChatGPT connection B -> tunnel B -> stdio Headless process B -> database B`
+`ChatGPT connection B -> devlens-tunnel@B (stdio bridge) -> private Unix socket -> devlens@B -> database B`
 
-Each `devlens@NAME.service` runs as a distinct `devlens-NAME` Linux user. The tunnel starts the headless process directly: no Windows computer, Avalonia, desktop named pipe, Redis or public MCP listener. Existing Core/Runtime provide SqlClient, ScriptDom validation, metadata, table/schema/definition paging, per-operation connection disposal, timeouts and memory-bounded captures. Only a positive allowlist of ten tools is registered. There are no execute/prepare/apply/approval/Postman tools and no auto-authorization flag. MCP returns unknown-tool errors for these names. Existing desktop workflow classes are dependencies internally but cannot be invoked through this headless catalog; no approval callback/policy is created.
+Each instance has independent `devlens@NAME.service` (SQL runtime) and `devlens-tunnel@NAME.service` (tunnel/stdio bridge) units under its dedicated `devlens-NAME` Linux user. The runtime uses a private 0700 directory and 0600 Unix socket: no Windows computer, Avalonia, desktop named pipe, Redis or public MCP listener. Existing Core/Runtime provide SqlClient, ScriptDom validation, metadata, table/schema/definition paging, per-operation connection disposal, timeouts and memory-bounded captures. Only a positive allowlist of ten tools is registered. There are no execute/prepare/apply/approval/Postman tools and no auto-authorization flag. MCP returns unknown-tool errors for these names. Existing desktop workflow classes are dependencies internally but cannot be invoked through this headless catalog; no approval callback/policy is created.
 
 The ten tools are `get_server_status`, `get_database_info`, `list_database_objects`, `describe_table`, `get_table_schema`, `read_table_page`, `query_read_only`, `get_procedure_definition`, `read_result_page`, `release_result`.
 
-Instance ID and configured database are explicit in status. Status reports process readiness only, not a successful SQL test; use `get_database_info` for live verification. Each tunnel child owns its sessions and captures. Child/tunnel/service restart clears captures; do not resume an old result ID after restart. This milestone does not promise persistent sessions across tunnel reconnects. Clients authorized for the same tunnel may access that instance; a tunnel is the tenant boundary, not an individual chat.
+Instance ID and configured database are explicit in status. Status reports process readiness only, not a successful SQL test; use `get_database_info` for live verification. Each persistent runtime owns its sessions and captures. Runtime/VM restart clears captures; do not resume an old result ID after runtime restart. A tunnel/bridge restart does not itself restart the runtime or clear captures, but clients must initialize a fresh session after disconnect; transparent replay is not promised. Clients authorized for the same tunnel may access that instance; a tunnel is the tenant boundary, not an individual chat.
 
 ## Build and package
 
@@ -37,8 +37,7 @@ tar -xzf SqlServerDevLens-linux-headless-0.1.0-linux-x64.tar.gz
 sudo install -d -m 0755 /opt/devlens
 sudo cp -a SqlServerDevLens-linux-headless-0.1.0-linux-x64/. /opt/devlens/
 sudo chown -R root:root /opt/devlens
-sudo install -m 0644 /opt/devlens/linux/devlens@.service /etc/systemd/system/
-sudo systemctl daemon-reload
+sudo bash /opt/devlens/linux/install-services.sh
 ```
 
 ## Configure two independent instances
@@ -62,17 +61,19 @@ sudo sh -c 'umask 077; systemd-ask-password "SQL password for tenant-a" > /etc/d
 sudo sh -c 'umask 077; systemd-ask-password "Tunnel runtime key for tenant-a" > /etc/devlens/tenant-a/tunnel-key; chmod 0400 /etc/devlens/tenant-a/tunnel-key'
 ```
 
-Systemd LoadCredential supplies private read-only credentials to that service and its child. SQL passwords stay in files/memory, never JSON or MCP arguments. The tunnel wrapper exports the runtime key for its child process, not system-wide. Host root can access all tenants; this is Unix user isolation, not protection against a compromised administrator/kernel. Protect backups and don't copy credential files into release artifacts. The launcher and profile are administrator-managed; a malicious same-UID process is inside the same tenant boundary.
+Systemd LoadCredential supplies SQL credentials only to the runtime unit and the tunnel key only to the tunnel unit. The bridge does not read SQL credentials. SQL passwords stay in files/memory, never JSON or MCP arguments. The tunnel wrapper exports the runtime key for its child process, not system-wide. Host root can access all tenants; this is Unix user isolation, not protection against a compromised administrator/kernel. Protect backups and don't copy credential files into release artifacts. The launcher and profile are administrator-managed; a malicious same-UID process is inside the same tenant boundary.
 
 6. Start the two services:
 
 ```bash
-sudo systemctl enable --now devlens@tenant-a devlens@tenant-b
-sudo systemctl status devlens@tenant-a devlens@tenant-b
+sudo bash /opt/devlens/linux/enable-instance.sh tenant-a
+sudo bash /opt/devlens/linux/enable-instance.sh tenant-b
+sudo devlens-health
+sudo systemctl status devlens@tenant-a devlens-tunnel@tenant-a
 sudo journalctl -u devlens@tenant-a -n 50 --no-pager
 ```
 
-Each service uses its own process tree, profile and secret mount. `KillMode=control-group` and the headless SIGTERM handler stop children and dispose database/result state. Restart is rate-limited; a 512 MiB per-service memory limit contains failures but is not a capacity guarantee. Captures are RAM-only and never persisted.
+Each service uses its own process tree, profile and secret mount. `KillMode=control-group` and the headless SIGTERM handler stop children and dispose database/result state. Runtime retries are spaced by 10 seconds and tunnel retries by 20 seconds, with no permanent start-limit lockout after a network outage. Explicit service/VM stops do not trigger restart. Runtime/tunnel limits are 512/256 MiB respectively, not a capacity guarantee. Captures are RAM-only and never persisted.
 
 ## Health and acceptance
 
@@ -112,3 +113,8 @@ Offline tests cover strict configuration/TLS, the ten-tool allowlist, blocked SQ
 Plan 2 vCPU/4 GB/40 GB for 2–5 lightly used instances only as a hypothesis. Measure complete tunnel+child process trees, concurrent SQL operations, peak capture memory and latency before accepting that target. Existing per-capture 16 Mi-character and aggregate 64 Mi-character budgets are reused; .NET strings/serialization and transient allocations can require substantially more RAM. More than one child per tunnel can multiply this. The service memory limit may terminate the tenant under pressure and clear captures. Do not size from idle RSS alone.
 
 Future approvals: add a separately authenticated, tenant-scoped operator control plane with immutable exact-action review, nonce/expiry, single-use apply, revision checks and private backups. Bind decisions to tenant, actor and request hash and audit without payload secrets. Do not expose approval grants to the agent or add unrestricted auto-approval. Postman and write tools remain absent until that design is reviewed and implemented.
+
+
+## Azure unattended boot and daily deallocation
+
+Follow the complete [Azure VM startup/shutdown guide](AZURE-VM-OPERATIONS.md). Both services are enabled once by `enable-instance.sh`; starting the VM then starts them without an interactive login. `/etc/devlens`, `/var/lib/devlens-*` and `/opt/devlens` must be on persistent managed disks. Only sockets/credential mounts under `/run` are ephemeral and rebuilt on each boot. No SQL write tools are enabled by these changes. The Azure auto-shutdown schedule is configured in Azure, not by a Linux shutdown cron job.
