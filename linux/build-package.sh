@@ -15,7 +15,7 @@ client=$(find "$package/tunnel" -type f -name tunnel-client -print -quit)
 [[ -n $client ]] || exit 1
 if [[ $client != "$package/tunnel/tunnel-client" ]]; then cp "$client" "$package/tunnel/tunnel-client"; fi
 chmod 0755 "$package/tunnel/tunnel-client" "$package/app/SqlServerDevLens.Headless" "$package/admin/SqlServerDevLens.Admin"
-cp linux/configure-instance.sh linux/start-tunnel.sh linux/wait-runtime.sh linux/install-services.sh linux/enable-instance.sh linux/enable-admin.sh linux/devlens-admin.service linux/devlens-health.py linux/instance.example.json linux/devlens@.service linux/devlens-tunnel@.service "$package/linux/"
+cp linux/configure-instance.sh linux/start-tunnel.sh linux/wait-runtime.sh linux/install-services.sh linux/enable-instance.sh linux/enable-admin.sh linux/devlens-admin.service linux/devlens-health.py linux/admin-smoke.py linux/instance.example.json linux/devlens@.service linux/devlens-tunnel@.service "$package/linux/"
 cp docs/LINUX-HEADLESS.md "$package/README.md"
 cp docs/AZURE-VM-OPERATIONS.md "$package/AZURE-VM-OPERATIONS.md"
 cp docs/LINUX-ADMIN-PORTAL.md "$package/LINUX-ADMIN-PORTAL.md"
@@ -26,6 +26,7 @@ printf '{"product":"linux-headless-read-only","version":"0.1.0","commit":"%s","p
 chmod 0755 "$package/linux/"*.sh
 python3 linux/protocol-smoke.py "$package/app/SqlServerDevLens.Headless"
 python3 linux/socket-smoke.py "$package/app/SqlServerDevLens.Headless"
+python3 linux/admin-smoke.py "$package/admin/SqlServerDevLens.Admin"
 ! find "$package/app" "$package/admin" -iname '*Avalonia*' | grep -q .
 tar -C "$out" -czf distribution/packages/linux-headless/SqlServerDevLens-linux-headless-0.1.0-linux-x64.tar.gz "$(basename "$package")"
 mkdir -p "$out/fresh extraction with spaces"
