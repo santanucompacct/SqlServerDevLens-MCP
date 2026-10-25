@@ -17,7 +17,10 @@ for name,port in [('ci-alpha',18080),('ci-beta',18081)]:
     assert 'env:CONTROL_PLANE_API_KEY' in profile
     assert '--desktop' not in profile
     assert pathlib.Path(f'/etc/devlens/{name}/instance.json').stat().st_mode & 0o777 == 0o400
+    directory=pathlib.Path(f'/etc/devlens/{name}')
+    assert directory.stat().st_uid == 0 and directory.stat().st_mode & 0o022 == 0
 print('PASS: two dedicated users, distinct loopback ports and instance-specific MCP profiles; no services started')
 PY
 if runuser -u devlens-ci-beta -- test -r /etc/devlens/ci-alpha/instance.json; then exit 1; fi
 if runuser -u devlens-ci-alpha -- test -r /var/lib/devlens-ci-beta/profiles/ci-beta.yaml; then exit 1; fi
+if runuser -u devlens-ci-alpha -- test -w /etc/devlens/ci-alpha; then exit 1; fi

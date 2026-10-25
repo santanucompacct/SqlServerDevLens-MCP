@@ -9,7 +9,9 @@ config="/etc/devlens/$instance"; state="/var/lib/devlens-$instance"; account="de
 [[ ! -e $config && ! -e $state ]] || { echo 'Instance exists; preserve it and follow upgrade instructions.' >&2; exit 1; }
 if id "$account" &>/dev/null; then echo 'User already exists; review it manually.' >&2; exit 1; fi
 useradd --system --user-group --no-create-home --shell /usr/sbin/nologin "$account"
-install -d -m 0700 -o "$account" -g "$account" "$config" "$state" "$state/profiles"
+# The service must not replace root LoadCredential source files with links to another tenant.
+install -d -m 0750 -o root -g "$account" "$config"
+install -d -m 0700 -o "$account" -g "$account" "$state" "$state/profiles"
 python3 - "$instance" "$config/instance.json" <<'PY'
 import json,sys
 with open('/opt/devlens/linux/instance.example.json') as f: config=json.load(f)
