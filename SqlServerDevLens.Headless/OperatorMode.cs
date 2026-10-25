@@ -26,7 +26,7 @@ public sealed record OperatorSettings(string Mode, DateTimeOffset? AutomaticUnti
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true,
                 UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow })
             ?? throw new InvalidOperationException("Missing operator configuration.");
-        if (settings.Mode is not ("read-only" or "full"))
+        if (settings.Mode is not ("read-only" or "full" or "sql-only"))
             throw new InvalidOperationException("Unsupported operator mode.");
         var names = settings.AutomaticCategories ?? [];
         if (names.Distinct(StringComparer.Ordinal).Count() != names.Length ||
@@ -37,6 +37,8 @@ public sealed record OperatorSettings(string Mode, DateTimeOffset? AutomaticUnti
             throw new InvalidOperationException("Auto authorization needs an expiry within 36 hours.");
         if (settings.Postman is { } p && (!ValidId(p.WorkspaceId) || !ValidId(p.CollectionId)))
             throw new InvalidOperationException("Invalid Postman selection.");
+        if (settings.Mode == "sql-only" && (settings.Postman is not null || names.Any(x => x.StartsWith("postman_", StringComparison.Ordinal))))
+            throw new InvalidOperationException("SQL-only mode cannot enable Postman.");
         if (settings.Mode == "read-only" && (names.Length > 0 || settings.Postman is not null))
             throw new InvalidOperationException("Read-only mode cannot enable actions or Postman.");
         return settings;
@@ -47,7 +49,7 @@ public sealed record OperatorSettings(string Mode, DateTimeOffset? AutomaticUnti
     public SessionAuthorization NewAuthorization()
     {
         var policy = new SessionAuthorization();
-        if (Mode == "full" && AutomaticUntilUtc > DateTimeOffset.UtcNow)
+        if (Mode is "full" or "sql-only" && AutomaticUntilUtc > DateTimeOffset.UtcNow)
             foreach (var category in AutomaticCategories ?? []) policy.Set(category, true);
         return policy;
     }
@@ -92,7 +94,7 @@ public sealed record OperatorSettings(string Mode, DateTimeOffset? AutomaticUnti
         var tools = new List<McpServerTool>
         {
             McpServerTool.Create(() => new {
-                service = "SQL Server DevLens MCP", mode = "linux-headless-full",
+                service = "SQL Server DevLens MCP", mode = Mode == "sql-only" ? "linux-headless-sql-only" : "linux-headless-full",
                 status = "running", instanceId = config.InstanceId, database = config.Database,
                 mutationsEnabled = true, postmanImplemented = selection is not null,
                 automaticUntilUtc = AutomaticUntilUtc,
