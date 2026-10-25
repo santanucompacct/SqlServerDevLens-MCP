@@ -115,6 +115,16 @@ public static class PortalStorage
         if (!process.WaitForExit(30000)) { process.Kill(entireProcessTree: true); throw new TimeoutException("Administrative command timed out."); }
         if (process.ExitCode != 0) throw new InvalidOperationException("Administrative command failed; see protected system journal.");
     }
+    public static void CreateInstance(string name, string tunnel, int dashboardPort)
+    {
+        if (!ValidName(name) || !System.Text.RegularExpressions.Regex.IsMatch(tunnel, "^tunnel_[A-Za-z0-9]+$") ||
+            dashboardPort is < 1024 or > 65535)
+            throw new ArgumentException("Invalid instance identity, tunnel or port.");
+        // Provisioning creates an OS user: ask PID 1 to run the fixed, validated root-owned installer.
+        // The web process itself retains a read-only system filesystem sandbox.
+        Run("/usr/bin/systemd-run", "--wait", "--collect", "--unit=devlens-provision-" + name,
+            "/usr/bin/bash", "/opt/devlens/linux/configure-instance.sh", name, tunnel, dashboardPort.ToString());
+    }
     public static void Service(string name, string action)
     {
         _ = Folder(name);
