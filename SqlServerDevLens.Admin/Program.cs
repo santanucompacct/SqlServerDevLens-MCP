@@ -102,7 +102,7 @@ app.MapPost("/new", async (HttpContext c) =>
     var name=f["name"].ToString(); var tunnel=f["tunnel"].ToString(); var port=f["port"].ToString();
     if (!PortalStorage.ValidName(name) || !System.Text.RegularExpressions.Regex.IsMatch(tunnel,"^tunnel_[A-Za-z0-9]+$") ||
         !int.TryParse(port,out var p) || p<1024 || p>65535) return Problem("Invalid instance name, tunnel ID or dashboard port.");
-    try { PortalStorage.Run("/usr/bin/bash", "/opt/devlens/linux/configure-instance.sh",name,tunnel,port); return Results.Redirect(Link(name)); }
+    try { PortalStorage.CreateInstance(name, tunnel, p); return Results.Redirect(Link(name)); }
     catch { return Problem("Provisioning failed. Review private server logs and existing instance configuration before retrying."); }
 });
 app.MapGet("/instance/{name}", (string name) =>
