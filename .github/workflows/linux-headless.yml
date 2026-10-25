@@ -1,0 +1,31 @@
+name: Linux headless distribution
+on:
+  push:
+    branches: [feature/linux-headless-multi-instance]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-headless:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet test SqlServerDevLens.Headless.Tests/SqlServerDevLens.Headless.Tests.csproj -c Release
+      - run: for file in linux/*.sh; do bash -n "$file"; done
+      - run: bash linux/build-package.sh
+      - name: Check service unit syntax
+        run: |
+          sudo cp linux/devlens@.service /run/systemd/system/
+          sudo mkdir -p /opt/devlens/linux
+          sudo install -m 0755 linux/start-tunnel.sh /opt/devlens/linux/
+          sudo systemd-analyze verify /run/systemd/system/devlens@.service
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DevLens-linux-headless-${{ github.run_id }}
+          path: distribution/packages/linux-headless/*

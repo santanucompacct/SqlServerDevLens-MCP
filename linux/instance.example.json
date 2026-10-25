@@ -1,0 +1,7 @@
+{
+  "instanceId": "example",
+  "host": "sql.example.internal",
+  "port": 1433,
+  "database": "ExampleDatabase",
+  "username": "devlens_reader"
+}
