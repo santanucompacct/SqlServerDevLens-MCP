@@ -12,7 +12,7 @@ import pathlib
 for name,port in [('ci-alpha',18080),('ci-beta',18081)]:
     profile=pathlib.Path(f'/var/lib/devlens-{name}/profiles/{name}.yaml').read_text()
     assert f'127.0.0.1:{port}' in profile
-    assert f'/etc/devlens/{name}/instance.json' in profile
+    assert f'--bridge /run/devlens-{name}/mcp.sock' in profile
     assert '/opt/devlens/app/SqlServerDevLens.Headless' in profile
     assert 'env:CONTROL_PLANE_API_KEY' in profile
     assert '--desktop' not in profile

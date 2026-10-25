@@ -22,5 +22,8 @@ chown "$account:$account" "$config/instance.json"; chmod 0400 "$config/instance.
 runuser -u "$account" -- env HOME="$state" /opt/devlens/tunnel/tunnel-client init --sample sample_mcp_stdio_local \
   --profile "$instance" --profile-dir "$state/profiles" --tunnel-id "$tunnel" \
   --control-plane-api-key-ref env:CONTROL_PLANE_API_KEY --health-listen-addr "127.0.0.1:$port" \
-  --mcp-command "/opt/devlens/app/SqlServerDevLens.Headless --config $config/instance.json"
+  --mcp-command "/opt/devlens/app/SqlServerDevLens.Headless --bridge /run/devlens-$instance/mcp.sock"
 echo 'Provisioned. Edit instance.json and create root-only sql-password/tunnel-key files. No service started.'
+
+printf "%s\n" "$port" > "$config/dashboard-port"
+chmod 0400 "$config/dashboard-port"

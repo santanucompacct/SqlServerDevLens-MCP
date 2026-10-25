@@ -25,10 +25,12 @@ jobs:
         run: sudo env DEVLENS_DISPOSABLE_CI=1 bash linux/provisioning-smoke.sh distribution/packages/linux-headless/SqlServerDevLens-linux-headless-0.1.0-linux-x64.tar.gz
       - name: Check service unit syntax
         run: |
-          sudo cp linux/devlens@.service /run/systemd/system/
+          sudo cp linux/devlens@.service linux/devlens-tunnel@.service /run/systemd/system/
           sudo mkdir -p /opt/devlens/linux
           sudo install -m 0755 linux/start-tunnel.sh /opt/devlens/linux/
-          sudo systemd-analyze verify /run/systemd/system/devlens@.service
+          sudo systemd-analyze verify /run/systemd/system/devlens@.service /run/systemd/system/devlens-tunnel@.service
+      - name: Verify unattended systemd lifecycle with offline tunnel fixture
+        run: sudo env DEVLENS_DISPOSABLE_CI=1 bash linux/systemd-smoke.sh
       - uses: actions/upload-artifact@v4
         with:
           name: DevLens-linux-headless-${{ github.run_id }}

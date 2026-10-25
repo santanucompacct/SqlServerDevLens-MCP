@@ -5,14 +5,25 @@ using SqlServerDevLens.Headless;
 
 try
 {
-    if (args.Length != 2 || args[0] is not ("--config" or "--check"))
-        throw new ArgumentException("Usage: SqlServerDevLens.Headless --config /etc/devlens/INSTANCE/instance.json (or --check PATH)");
-    var config = InstanceConfiguration.Load(args[1]);
-    using var database = new SqlDatabase(config.Profile(), InstanceConfiguration.ReadPassword());
     using var stop = new CancellationTokenSource();
     Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); };
     using var terminate = OperatingSystem.IsLinux() ? PosixSignalRegistration.Create(PosixSignal.SIGTERM,
         context => { context.Cancel = true; stop.Cancel(); }) : null;
+    if (args.Length == 2 && args[0] == "--bridge")
+    {
+        await UnixRuntime.BridgeAsync(args[1], stop.Token);
+        return 0;
+    }
+    if (!((args.Length == 2 && args[0] is "--config" or "--check") || (args.Length == 4 && args[0] == "--serve" && args[2] == "--socket")))
+        throw new ArgumentException("Expected --config PATH, --check PATH, --serve PATH --socket PATH, or --bridge SOCKET.");
+    var config = InstanceConfiguration.Load(args[1]);
+    using var database = new SqlDatabase(config.Profile(), InstanceConfiguration.ReadPassword());
+    if (args[0] == "--serve")
+    {
+        Console.Error.WriteLine($"Instance {config.InstanceId}: private read-only runtime starting.");
+        await UnixRuntime.ServeAsync(args[3], ReadOnlyCatalog.Create(config, database), stop.Token);
+        return 0;
+    }
     if (args[0] == "--check")
     {
         await database.GetDatabaseInfoAsync(stop.Token);
