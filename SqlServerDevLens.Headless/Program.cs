@@ -3,6 +3,7 @@ using ModelContextProtocol.Server;
 using SqlServerDevLens.Core;
 using SqlServerDevLens.Headless;
 
+var stage = "arguments";
 try
 {
     using var stop = new CancellationTokenSource();
@@ -16,11 +17,16 @@ try
     }
     if (!((args.Length == 2 && args[0] is "--config" or "--check") || (args.Length == 4 && args[0] == "--serve" && args[2] == "--socket")))
         throw new ArgumentException("Expected --config PATH, --check PATH, --serve PATH --socket PATH, or --bridge SOCKET.");
+    stage = "configuration";
     var config = InstanceConfiguration.Load(args[1]);
-    using var database = new SqlDatabase(config.Profile(), InstanceConfiguration.ReadPassword());
+    stage = "credential";
+    var password = InstanceConfiguration.ReadPassword();
+    stage = "sql-context";
+    using var database = new SqlDatabase(config.Profile(), password);
     if (args[0] == "--serve")
     {
         Console.Error.WriteLine($"Instance {config.InstanceId}: private read-only runtime starting.");
+        stage = "runtime-socket";
         await UnixRuntime.ServeAsync(args[3], ReadOnlyCatalog.Create(config, database), stop.Token);
         return 0;
     }
@@ -38,9 +44,9 @@ try
     catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
     return 0;
 }
-catch (Exception)
+catch (Exception error)
 {
     // Never print provider exceptions, config contents, arguments or connection strings.
-    Console.Error.WriteLine("Headless startup/check failed. Check private configuration, credential permissions, SQL access and TLS. No automatic SQL retry.");
+    Console.Error.WriteLine($"Headless failed at {stage} ({error.GetType().Name}). Check private configuration, credential permissions, SQL access and TLS. No automatic SQL retry.");
     return 1;
 }

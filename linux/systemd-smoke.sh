@@ -2,6 +2,7 @@
 # Disposable CI only. Fake tunnel replaces external network activity; real runtime uses synthetic credentials.
 set -euo pipefail
 [[ $EUID == 0 && ${DEVLENS_DISPOSABLE_CI:-} == 1 ]] || exit 64
+trap 'journalctl -u devlens@ci-alpha -u devlens-tunnel@ci-alpha -u devlens@ci-beta -n 100 --no-pager' ERR
 bash /opt/devlens/linux/install-services.sh
 for instance in ci-alpha ci-beta; do
   for secret in sql-password tunnel-key; do
