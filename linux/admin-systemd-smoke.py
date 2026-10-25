@@ -80,14 +80,14 @@ try:
         with client.makefile("rwb",buffering=0) as channel:
             def request(ident,method,params):
                 payload=json.dumps(dict(jsonrpc="2.0",id=ident,method=method,params=params))
-                channel.write((payload+"\\n").encode())
+                channel.write((payload+"\n").encode())
                 for _ in range(20):
                     result=json.loads(channel.readline(1024*1024))
                     if result.get("id")==ident: return result["result"]
                 raise RuntimeError("Missing MCP response")
             request(1,"initialize",dict(protocolVersion="2025-11-25",capabilities={},
                 clientInfo=dict(name="admin-systemd-ci",version="1")))
-            channel.write(b'{"jsonrpc":"2.0","method":"notifications/initialized"}\\n')
+            channel.write(b'{"jsonrpc":"2.0","method":"notifications/initialized"}\n')
             tools=request(2,"tools/list",{})
             names={tool["name"] for tool in tools["tools"]}
             assert "prepare_procedure_execution" in names and "apply_table_sql" in names
