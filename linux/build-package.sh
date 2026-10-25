@@ -14,7 +14,7 @@ client=$(find "$package/tunnel" -type f -name tunnel-client -print -quit)
 [[ -n $client ]] || exit 1
 if [[ $client != "$package/tunnel/tunnel-client" ]]; then cp "$client" "$package/tunnel/tunnel-client"; fi
 chmod 0755 "$package/tunnel/tunnel-client" "$package/app/SqlServerDevLens.Headless"
-cp linux/*.sh linux/*.json linux/*.service "$package/linux/"
+cp linux/configure-instance.sh linux/start-tunnel.sh linux/instance.example.json linux/devlens@.service "$package/linux/"
 cp docs/LINUX-HEADLESS.md "$package/README.md"
 cp LICENSE "$package/LICENSE" 2>/dev/null || cp LICENSE.txt "$package/LICENSE"
 dotnet list SqlServerDevLens.Headless/SqlServerDevLens.Headless.csproj package --include-transitive > "$package/DEPENDENCIES.txt"

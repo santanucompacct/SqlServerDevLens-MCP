@@ -18,6 +18,8 @@ jobs:
           dotnet-version: '10.0.x'
       - run: dotnet test SqlServerDevLens.Headless.Tests/SqlServerDevLens.Headless.Tests.csproj -c Release
       - run: for file in linux/*.sh; do bash -n "$file"; done
+      - name: Check private credential directories across Linux users
+        run: sudo env DEVLENS_DISPOSABLE_CI=1 bash linux/os-isolation-smoke.sh
       - run: bash linux/build-package.sh
       - name: Check service unit syntax
         run: |
