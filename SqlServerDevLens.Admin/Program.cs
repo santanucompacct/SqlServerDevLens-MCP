@@ -140,15 +140,20 @@ app.MapGet("/instance/{name}", (string name) =>
             "<label><input type='checkbox' name='trust' value='yes' "+(d.TrustServerCertificate?"checked":"")+">Trust server certificate (skip certificate validation)</label>"+
             "<p class='muted'>Skipping certificate validation weakens server identity verification. For trusted development SQL servers only.</p>"+
             "<button>Save SQL connection</button>");
+        var sqlOnly = op.Mode == "sql-only";
+        var modeForm=F(Link(name)+"/mode",csrf,
+            "<label>Choose integration mode<select name='mode'>"+
+            "<option value='sql-only' "+(sqlOnly||op.Mode=="read-only"?"selected":"")+">SQL Only — full SQL operations</option>"+
+            "<option value='full' "+(op.Mode=="full"?"selected":"")+">SQL + Postman — full SQL and Postman operations</option>"+
+            "</select></label><button>Save mode and continue</button>");
         var secretForm=SecretPanel(name,csrf,"sql-password","SQL Password")+
             SecretPanel(name,csrf,"tunnel-key","OpenAI Tunnel Key","https://platform.openai.com/api-keys")+
-            SecretPanel(name,csrf,"postman-key","Postman API Key","https://go.postman.co/settings/me/api-keys");
-        var checks=string.Join("",SessionAuthorization.Categories.Select(category =>
+            (sqlOnly||op.Mode=="read-only"?"":SecretPanel(name,csrf,"postman-key","Postman API Key","https://go.postman.co/settings/me/api-keys"));
+        var checks=string.Join("",SessionAuthorization.Categories.Where(category => !sqlOnly || !category.StartsWith("postman_", StringComparison.Ordinal)).Select(category =>
             "<label><input type='checkbox' name='category' value='"+E(category)+"' "+
             ((op.AutomaticCategories??[]).Contains(category) ? "checked " : "")+">"+E(category)+"</label>"));
         var policyForm=F(Link(name)+"/policy",csrf,
-            "<label>Tool mode<select name='mode'><option value='read-only'>SQL read-only</option>"+
-            "<option value='full' "+(op.Mode=="full"?"selected":"")+">SQL + Postman + controlled writes</option></select></label>"+
+            "<input type='hidden' name='mode' value='"+E(op.Mode)+"'>"+
             "<p class='muted'>Select categories to auto-authorize exact staged actions. These permissions expire. "+
             "Unselected categories cannot execute without a separate approval mechanism.</p>"+checks+
             Input("hours","Hours until automatic authorization expires (1–24)","12","number")+
@@ -163,14 +168,15 @@ app.MapGet("/instance/{name}", (string name) =>
             "<button name='action' value='stop'>Stop</button>");
         return Html(Page("Configure "+name,
             "<p class='muted'>SQL and Postman settings apply after restarting this instance. Dashboard and tunnel are isolated.</p>"+
+            "<section><h2>Step 1 — Choose integration mode</h2>"+modeForm+"</section>"+
             "<div class='grid'><section><h2>SQL Connection</h2>"+
             (string.IsNullOrWhiteSpace(d.Host)||string.IsNullOrWhiteSpace(d.Database)||string.IsNullOrWhiteSpace(d.Username)?
             "<p class='bad'>Required SQL connection details are missing.</p>":"")+
             form+sqlCheckForm+"</section>"+
             "<section><h2>Protected Credentials</h2>"+secretForm+"</section>"+
             "<section><h2>Authorization</h2>"+policyForm+"</section>"+
-            "<section><h2>Postman</h2><p>"+(op.Postman is null?"No collection selected":E(op.Postman.CollectionId))+
-            "</p><a href='"+Link(name)+"/postman'>Select workspace &amp; collection</a></section>"+
+            (sqlOnly||op.Mode=="read-only"?"":"<section><h2>Postman</h2><p>"+(op.Postman is null?"No collection selected":E(op.Postman.CollectionId))+
+            "</p><a href='"+Link(name)+"/postman'>Select workspace &amp; collection</a></section>")+
             "<section><h2>Service</h2><p>SQL MCP runtime: "+State(runtimeState)+"</p><p>OpenAI tunnel: "+State(tunnelState)+
             "</p><p>Boot service: "+State(bootState,true)+"</p>"+serviceForm+
             "<p class='muted'>Enable once to start automatically whenever the Azure VM boots.</p></section></div>"));
@@ -203,6 +209,22 @@ app.MapPost("/instance/{name}/secret", async (string name,HttpContext c) =>
     try { PortalStorage.SaveSecret(name,f["kind"].ToString(),f["value"].ToString()); return Results.Redirect(Link(name)); }
     catch { return Problem("Credential validation or secure storage failed."); }
 });
+app.MapPost("/instance/{name}/mode", async (string name, HttpContext c) =>
+{
+    var f = await c.Request.ReadFormAsync();
+    var mode = f["mode"].ToString();
+    if (mode is not ("sql-only" or "full")) return Problem("Choose SQL Only or SQL + Postman.");
+    try
+    {
+        var prior=PortalStorage.Operator(name);
+        var categories=prior.AutomaticCategories.Where(x =>
+            mode=="full" || !x.StartsWith("postman_",StringComparison.Ordinal)).ToArray();
+        PortalStorage.SaveOperator(name,new(mode,categories.Length>0?prior.AutomaticUntilUtc:null,
+            categories,mode=="full"?prior.Postman:null));
+        return Results.Redirect(Link(name));
+    }
+    catch { return Problem("Could not change mode. Clear expired authorization settings and try again."); }
+});
 app.MapPost("/instance/{name}/policy", async (string name,HttpContext c) =>
 {
     var f=await c.Request.ReadFormAsync(); var mode=f["mode"].ToString();
@@ -211,7 +233,7 @@ app.MapPost("/instance/{name}/policy", async (string name,HttpContext c) =>
     try
     {
         var previous=PortalStorage.Operator(name);
-        var expiry=mode=="full"&&categories.Length>0 ? DateTimeOffset.UtcNow.AddHours(hours) : (DateTimeOffset?)null;
+        var expiry=mode!="read-only"&&categories.Length>0 ? DateTimeOffset.UtcNow.AddHours(hours) : (DateTimeOffset?)null;
         PortalStorage.SaveOperator(name,new(mode,expiry,categories,
             mode=="full"?previous.Postman:null));
         return Results.Redirect(Link(name));
