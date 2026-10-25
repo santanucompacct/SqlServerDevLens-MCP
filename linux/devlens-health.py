@@ -7,6 +7,9 @@ def health(directory):
     try:
         for unit in (f'devlens@{name}', f'devlens-tunnel@{name}'):
             subprocess.run(['systemctl','is-active','--quiet',unit],check=True,timeout=5)
+        pid=subprocess.run(['systemctl','show','--property=MainPID','--value',f'devlens-tunnel@{name}'],
+                           check=True,timeout=5,capture_output=True,text=True).stdout.strip()
+        if not pid.isdigit() or int(pid)<=1: raise ValueError('tunnel pid')
         config=json.loads((directory/'instance.json').read_text())
         port=(directory/'dashboard-port').read_text().strip()
         if not port.isdigit() or not 1024<=int(port)<=65535: raise ValueError('port')
@@ -30,7 +33,7 @@ def health(directory):
                 if data['instanceId']!=name or data['database']!=config['database'] or data['mutationsEnabled']: raise ValueError('identity')
                 database=request(3,'tools/call',dict(name='get_database_info',arguments={}))
                 if database.get('isError'): raise ValueError('sql')
-        subprocess.run(['/opt/devlens/tunnel/tunnel-client','health','--port',port,'--require-control-plane-poll','--json'],
+        subprocess.run(['/opt/devlens/tunnel/tunnel-client','health','--port',port,'--pid',pid,'--require-control-plane-poll','--json'],
                        check=True,timeout=15,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         return name,True
     except Exception:

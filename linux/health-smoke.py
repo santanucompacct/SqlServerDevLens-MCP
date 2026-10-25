@@ -18,8 +18,8 @@ class HealthTests(unittest.TestCase):
             client.makefile.return_value.__enter__.return_value=channel
             def command(args,**kwargs):
                 if poll_error and 'health' in args: raise subprocess.CalledProcessError(1,args)
-                return subprocess.CompletedProcess(args,0)
-            with unittest.mock.patch.object(health.socket,'socket',return_value=client), unittest.mock.patch.object(health.subprocess,'run',side_effect=command):
+                return subprocess.CompletedProcess(args,0,stdout='123\n')
+            with unittest.mock.patch.object(health.socket,'AF_UNIX',1,create=True), unittest.mock.patch.object(health.socket,'socket',return_value=client), unittest.mock.patch.object(health.subprocess,'run',side_effect=command):
                 return health.health(directory)
     def test_ready_requires_all_layers(self): self.assertEqual(('tenant-a',True),self.run_health())
     def test_wrong_runtime_is_rejected(self): self.assertEqual(('tenant-a',False),self.run_health(wrong_identity=True))
