@@ -29,7 +29,7 @@ public sealed record InstanceConfiguration(string InstanceId, string Host, int P
             throw new ArgumentException("Config directory must match instanceId.");
         return config;
     }
-    public static string ReadPassword()
+    public static string ReadPassword(string? expectedInstance = null)
     {
         // systemd LoadCredential gives each service its own read-only credentials mount.
         var directory = Environment.GetEnvironmentVariable("CREDENTIALS_DIRECTORY");
@@ -41,7 +41,11 @@ public sealed record InstanceConfiguration(string InstanceId, string Host, int P
         var privateMount = OperatingSystem.IsLinux() && Directory.Exists(directory) &&
             (File.GetUnixFileMode(directory) & (UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute |
                 UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute)) == 0;
-        CheckPrivateFile(path, privateMount);
+        try { CheckPrivateFile(path, privateMount); }
+        catch (ArgumentException) when (OperatingSystem.IsLinux() && expectedInstance is not null &&
+            directory == $"/run/credentials/devlens@{expectedInstance}.service" &&
+            SystemdCredentialAcl.IsPrivate(directory, true) && SystemdCredentialAcl.IsPrivate(path, false))
+        { /* systemd's named-user ACL mask is not a shared-group grant. */ }
         if (new FileInfo(path).Length > 4096) throw new ArgumentException("SQL credential exceeds 4 KiB.");
         var value = File.ReadAllText(path).TrimEnd('\r', '\n');
         if (string.IsNullOrEmpty(value) || value.IndexOfAny(['\r', '\n', '\0']) >= 0)

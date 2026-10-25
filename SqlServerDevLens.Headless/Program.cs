@@ -20,7 +20,7 @@ try
     stage = "configuration";
     var config = InstanceConfiguration.Load(args[1]);
     stage = "credential";
-    var password = InstanceConfiguration.ReadPassword();
+    var password = InstanceConfiguration.ReadPassword(config.InstanceId);
     stage = "sql-context";
     using var database = new SqlDatabase(config.Profile(), password);
     if (args[0] == "--serve")
