@@ -14,11 +14,12 @@ public static class ReadOnlyCatalog
     };
     public static McpServerTool[] Create(InstanceConfiguration config, ISqlDatabase database)
     {
+        var runtimeId = Guid.NewGuid().ToString("N");
         var tools = new List<McpServerTool>
         {
             McpServerTool.Create(() => new {
                 service = "SQL Server DevLens MCP", mode = "linux-headless-read-only", status = "running",
-                instanceId = config.InstanceId, database = database.Database, sqlConfigured = true, sqlConnected = false,
+                instanceId = config.InstanceId, runtimeId, database = database.Database, sqlConfigured = true, sqlConnected = false,
                 lastSqlTestSucceeded = (bool?)null, postmanImplemented = false, mutationsEnabled = false,
                 capturedResultMaxCharacters = CapturedResults.MaxCaptureCharacters, capturedResultsExpireMinutes = 15,
                 message = "Process status only; call get_database_info to verify SQL. No execution, mutation, Postman or approval tools. Captures belong to this process and clear on restart."

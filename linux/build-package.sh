@@ -18,8 +18,12 @@ cp linux/configure-instance.sh linux/start-tunnel.sh linux/instance.example.json
 cp docs/LINUX-HEADLESS.md "$package/README.md"
 cp LICENSE "$package/LICENSE" 2>/dev/null || cp LICENSE.txt "$package/LICENSE"
 dotnet list SqlServerDevLens.Headless/SqlServerDevLens.Headless.csproj package --include-transitive > "$package/DEPENDENCIES.txt"
+printf '{"product":"linux-headless-read-only","version":"0.1.0","commit":"%s","privateIdentityIncluded":false}\n' "$(git rev-parse HEAD)" > "$package/BUILD-INFO.json"
 chmod 0755 "$package/linux/"*.sh
 python3 linux/protocol-smoke.py "$package/app/SqlServerDevLens.Headless"
 ! find "$package/app" -iname '*Avalonia*' | grep -q .
 tar -C "$out" -czf distribution/packages/linux-headless/SqlServerDevLens-linux-headless-0.1.0-linux-x64.tar.gz "$(basename "$package")"
+mkdir -p "$out/fresh extraction with spaces"
+tar -C "$out/fresh extraction with spaces" -xzf distribution/packages/linux-headless/SqlServerDevLens-linux-headless-0.1.0-linux-x64.tar.gz
+python3 linux/protocol-smoke.py "$out/fresh extraction with spaces/$(basename "$package")/app/SqlServerDevLens.Headless"
 (cd distribution/packages/linux-headless && sha256sum ./*.tar.gz > SHA256SUMS.txt)
