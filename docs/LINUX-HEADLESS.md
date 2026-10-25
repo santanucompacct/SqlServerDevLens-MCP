@@ -16,7 +16,7 @@ Instance ID and configured database are explicit in status. Status reports proce
 
 ## Build and package
 
-No Visual Studio is needed. On Linux with .NET 10 SDK, bash, Python 3, curl, unzip and tar:
+No Visual Studio is needed. On Linux with .NET 10 SDK, bash, Python 3, curl, unzip, acl and tar:
 
 ```bash
 dotnet test SqlServerDevLens.Headless.Tests/SqlServerDevLens.Headless.Tests.csproj -c Release

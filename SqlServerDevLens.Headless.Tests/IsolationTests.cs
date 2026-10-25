@@ -7,6 +7,28 @@ namespace SqlServerDevLens.Headless.Tests;
 public sealed class IsolationTests
 {
     [Fact]
+    public void LinuxNamedUserCredentialAclRejectsAnUnrelatedUserGrant()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        var path = Path.GetTempFileName();
+        try
+        {
+            File.SetUnixFileMode(path, UnixFileMode.UserRead);
+            void Acl(string value)
+            {
+                var info = new System.Diagnostics.ProcessStartInfo("/usr/bin/setfacl") { UseShellExecute = false };
+                foreach (var arg in new[] { "-m", value, path }) info.ArgumentList.Add(arg);
+                using var process = System.Diagnostics.Process.Start(info)!;
+                Assert.True(process.WaitForExit(5000)); Assert.Equal(0, process.ExitCode);
+            }
+            Acl($"u:{Environment.UserName}:r--");
+            Assert.True(SystemdCredentialAcl.IsPrivate(path, false));
+            Acl("u:60000:r--");
+            Assert.False(SystemdCredentialAcl.IsPrivate(path, false));
+        }
+        finally { File.Delete(path); }
+    }
+    [Fact]
     public void CredentialReadAcceptsOnlyPrivateFilesAndRejectsWorldReadableSecrets()
     {
         var directory = Path.Combine(Path.GetTempPath(), "credential-" + Guid.NewGuid().ToString("N"));
