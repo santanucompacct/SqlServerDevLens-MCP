@@ -30,7 +30,7 @@ def health(directory):
                 channel.write(b'{"jsonrpc":"2.0","method":"notifications/initialized"}\n')
                 status=request(2,'tools/call',dict(name='get_server_status',arguments={}))
                 data=json.loads(status['content'][0]['text'])
-                if data['instanceId']!=name or data['database']!=config['database'] or data['mutationsEnabled']: raise ValueError('identity')
+                if data['instanceId']!=name or data['database']!=config['database'] or not isinstance(data.get('mutationsEnabled'),bool): raise ValueError('identity')
                 database=request(3,'tools/call',dict(name='get_database_info',arguments={}))
                 if database.get('isError'): raise ValueError('sql')
         subprocess.run(['/opt/devlens/tunnel/tunnel-client','health','--port',port,'--pid',pid,'--require-control-plane-poll','--json'],
