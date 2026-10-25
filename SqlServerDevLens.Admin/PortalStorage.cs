@@ -60,10 +60,11 @@ public static class PortalStorage
         {
             File.WriteAllText(tmp, content, new UTF8Encoding(false));
             File.SetUnixFileMode(tmp, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-            // Always set owner/group before making tenant configuration readable.
-            Run("/usr/bin/chown", owner, tmp);
+            // Set restrictive mode while still owned by root. The admin unit deliberately
+            // lacks CAP_FOWNER, so chmod after chown would fail with EPERM.
             File.SetUnixFileMode(tmp, mode == "0400" ? UnixFileMode.UserRead :
                 UnixFileMode.UserRead | UnixFileMode.GroupRead);
+            Run("/usr/bin/chown", owner, tmp);
             File.Move(tmp, destination, overwrite: true);
         }
         finally { if (File.Exists(tmp)) File.Delete(tmp); }
