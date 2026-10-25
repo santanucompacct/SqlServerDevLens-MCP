@@ -33,6 +33,8 @@ jobs:
           sudo systemd-analyze verify /run/systemd/system/devlens@.service /run/systemd/system/devlens-tunnel@.service /run/systemd/system/devlens-admin.service
       - name: Verify unattended systemd lifecycle with offline tunnel fixture
         run: sudo env DEVLENS_DISPOSABLE_CI=1 bash linux/systemd-smoke.sh
+      - name: Verify portal under real systemd sandbox with synthetic tenant credentials
+        run: sudo env DEVLENS_DISPOSABLE_CI=1 python3 linux/admin-systemd-smoke.py
       - uses: actions/upload-artifact@v4
         with:
           name: DevLens-linux-headless-${{ github.run_id }}
