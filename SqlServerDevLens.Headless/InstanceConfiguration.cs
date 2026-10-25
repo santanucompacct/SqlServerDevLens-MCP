@@ -36,19 +36,24 @@ public sealed record InstanceConfiguration(string InstanceId, string Host, int P
         if (string.IsNullOrWhiteSpace(directory) || !Path.IsPathFullyQualified(directory))
             throw new ArgumentException("A protected systemd credentials directory is required.");
         var path = Path.Combine(directory, "sql-password");
-        CheckPrivateFile(path);
+        // systemd may expose group-readable credential files inside its private mount.
+        // Require the mount directory itself to exclude all group/other traversal.
+        var privateMount = OperatingSystem.IsLinux() && Directory.Exists(directory) &&
+            (File.GetUnixFileMode(directory) & (UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute |
+                UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute)) == 0;
+        CheckPrivateFile(path, privateMount);
         if (new FileInfo(path).Length > 4096) throw new ArgumentException("SQL credential exceeds 4 KiB.");
         var value = File.ReadAllText(path).TrimEnd('\r', '\n');
         if (string.IsNullOrEmpty(value) || value.IndexOfAny(['\r', '\n', '\0']) >= 0)
             throw new ArgumentException("Invalid SQL credential file.");
         return value;
     }
-    private static void CheckPrivateFile(string path)
+    private static void CheckPrivateFile(string path, bool privateCredentialMount = false)
     {
         if (!File.Exists(path) || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
             throw new ArgumentException("Expected a regular private configuration or credential file.");
         if (OperatingSystem.IsLinux() && (File.GetUnixFileMode(path) &
-            (UnixFileMode.GroupWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute)) != 0)
+            (UnixFileMode.GroupWrite | (privateCredentialMount ? 0 : UnixFileMode.GroupRead) | UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute)) != 0)
             throw new ArgumentException("Configuration and credentials must not be accessible to group or other users.");
     }
 }

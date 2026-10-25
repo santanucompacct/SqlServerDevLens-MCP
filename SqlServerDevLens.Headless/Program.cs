@@ -48,5 +48,7 @@ catch (Exception error)
 {
     // Never print provider exceptions, config contents, arguments or connection strings.
     Console.Error.WriteLine($"Headless failed at {stage} ({error.GetType().Name}). Check private configuration, credential permissions, SQL access and TLS. No automatic SQL retry.");
+    if (stage == "credential" && error is ArgumentException)
+        Console.Error.WriteLine(error.Message); // Credential validation messages contain no values.
     return 1;
 }
