@@ -58,7 +58,7 @@ def main(binary):
             except urllib.error.HTTPError as exc:
                 assert exc.code == 302
                 cookie = exc.headers.get("Set-Cookie", "")
-                assert "HttpOnly" in cookie and "SameSite=strict" in cookie.lower()
+                assert "httponly" in cookie.lower() and "samesite=strict" in cookie.lower()
                 session = cookie.split(";", 1)[0]
             headers = {"Cookie": session}
             response = opener.open(urllib.request.Request(base + "/", headers=headers), timeout=4)
