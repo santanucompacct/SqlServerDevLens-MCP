@@ -90,7 +90,7 @@ public sealed record OperatorSettings(string Mode, DateTimeOffset? AutomaticUnti
     public McpServerTool[] CreateTools(InstanceConfiguration config, SqlDatabase database,
         SessionAuthorization authorization, PostmanSelection? selection, PostmanWorkflow? workflow)
     {
-        if (Mode != "full") return ReadOnlyCatalog.Create(config, database);
+        if (Mode == "read-only") return ReadOnlyCatalog.Create(config, database);
         var tools = new List<McpServerTool>
         {
             McpServerTool.Create(() => new {
