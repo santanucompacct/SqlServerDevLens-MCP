@@ -113,6 +113,9 @@ app.MapGet("/instance/{name}", (string name) =>
         var form=F(Link(name)+"/db",csrf,
             Input("host","SQL Server DNS host",d.Host,"text",true)+Input("port","SQL port",d.Port.ToString(),"number",true)+
             Input("database","Database name",d.Database,"text",true)+Input("username","SQL login",d.Username,"text",true)+
+            "<label><input type='checkbox' name='encrypt' value='yes' "+(d.EncryptConnection?"checked":"")+">Encrypt connection</label>"+
+            "<label><input type='checkbox' name='trust' value='yes' "+(d.TrustServerCertificate?"checked":"")+">Trust server certificate (skip certificate validation)</label>"+
+            "<p class='muted'>Skipping certificate validation weakens server identity verification. For trusted development SQL servers only.</p>"+
             "<button>Save SQL connection</button>");
         var secretForm=F(Link(name)+"/secret",csrf,
             "<label>Credential type<select name='kind'><option value='sql-password'>SQL password</option>"+
@@ -128,13 +131,16 @@ app.MapGet("/instance/{name}", (string name) =>
             "Unselected categories cannot execute without a separate approval mechanism.</p>"+checks+
             Input("hours","Hours until automatic authorization expires (1–24)","12","number")+
             "<button>Save operator policy</button>");
+        var sqlCheckForm=F(Link(name)+"/sql-check",csrf,"<button>Test SQL connection</button>");
+        var runtimeState=PortalStorage.UnitState(name,false);
+        var tunnelState=PortalStorage.UnitState(name,true);
         var serviceForm=F(Link(name)+"/service",csrf,
             "<button name='action' value='enable'>Enable boot services</button>"+
             "<button name='action' value='start'>Start</button><button name='action' value='restart'>Restart</button>"+
             "<button name='action' value='stop'>Stop</button>");
         return Html(Page("Configure "+name,
             "<p class='muted'>SQL and Postman settings apply after restarting this instance. Dashboard and tunnel are isolated.</p>"+
-            "<div class='grid'><section><h2>SQL Connection</h2>"+form+"</section>"+
+            "<div class='grid'><section><h2>SQL Connection</h2>"+form+sqlCheckForm+"</section>"+
             "<section><h2>Protected Credentials</h2>"+secretForm+
             "<p>SQL secret: "+(PortalStorage.HasSecret(name,"sql-password")?"set":"missing")+
             " · Tunnel key: "+(PortalStorage.HasSecret(name,"tunnel-key")?"set":"missing")+
@@ -142,7 +148,7 @@ app.MapGet("/instance/{name}", (string name) =>
             "<section><h2>Authorization</h2>"+policyForm+"</section>"+
             "<section><h2>Postman</h2><p>"+(op.Postman is null?"No collection selected":E(op.Postman.CollectionId))+
             "</p><a href='"+Link(name)+"/postman'>Select workspace &amp; collection</a></section>"+
-            "<section><h2>Service</h2>"+serviceForm+
+            "<section><h2>Service</h2><p>SQL MCP runtime: <strong>"+E(runtimeState)+"</strong> · OpenAI tunnel: <strong>"+E(tunnelState)+"</strong></p>"+serviceForm+
             "<p class='muted'>Enable once to start automatically whenever the Azure VM boots.</p></section></div>"));
     }
     catch { return Problem("Unknown instance or invalid private configuration."); }
@@ -151,8 +157,17 @@ app.MapPost("/instance/{name}/db", async (string name,HttpContext c) =>
 {
     var f=await c.Request.ReadFormAsync();
     if (!int.TryParse(f["port"].ToString(),out var port)) return Problem("Invalid SQL port.");
-    try { PortalStorage.SaveDatabase(name,new(name,f["host"].ToString(),port,f["database"].ToString(),f["username"].ToString())); return Results.Redirect(Link(name)); }
-    catch { return Problem("Could not validate or save the SQL configuration."); }
+    try { PortalStorage.SaveDatabase(name,new(name,f["host"].ToString(),port,f["database"].ToString(),f["username"].ToString(),
+            f["encrypt"].ToString()=="yes",f["trust"].ToString()=="yes")); return Results.Redirect(Link(name)); }
+    catch (ArgumentException) { return Problem("Invalid SQL host, port, database or login."); }
+    catch (Exception e) { app.Logger.LogError("SQL config save failed: {ErrorType}", e.GetType().Name);
+        return Problem("SQL configuration could not be saved. Check admin service filesystem permissions."); }
+});
+app.MapPost("/instance/{name}/sql-check", (string name) =>
+{
+    try { return Html(Page("SQL connection check — "+name,"<article><p>"+E(PortalStorage.SqlCheck(name))+
+        "</p><p><a href='"+Link(name)+"'>Return to instance</a></p></article>")); }
+    catch { return Problem("SQL test could not be started. Check the admin service journal."); }
 });
 app.MapPost("/instance/{name}/secret", async (string name,HttpContext c) =>
 {
