@@ -45,8 +45,8 @@ bool SignedIn(HttpContext c)
 }
 app.Use(async (context, next) =>
 {
-    context.Response.Headers.CacheControl = "no-store";
-    context.Response.Headers.XContentTypeOptions = "nosniff";
+    context.Response.Headers["Cache-Control"] = "no-store";
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
     context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
     if (context.Connection.RemoteIpAddress is not null && !IPAddress.IsLoopback(context.Connection.RemoteIpAddress))
     { context.Response.StatusCode = 403; return; }
@@ -110,7 +110,7 @@ app.MapGet("/instance/{name}", (string name) =>
     try
     {
         var d=PortalStorage.Database(name); var op=PortalStorage.Operator(name);
-        var form=F(Link(name)+"/db",Input("csrf","",csrf,"hidden") is string ? csrf : csrf,
+        var form=F(Link(name)+"/db",csrf,
             Input("host","SQL Server DNS host",d.Host,"text",true)+Input("port","SQL port",d.Port.ToString(),"number",true)+
             Input("database","Database name",d.Database,"text",true)+Input("username","SQL login",d.Username,"text",true)+
             "<button>Save SQL connection</button>");
@@ -150,7 +150,7 @@ app.MapGet("/instance/{name}", (string name) =>
 app.MapPost("/instance/{name}/db", async (string name,HttpContext c) =>
 {
     var f=await c.Request.ReadFormAsync();
-    if (!int.TryParse(f["port"],out var port)) return Problem("Invalid SQL port.");
+    if (!int.TryParse(f["port"].ToString(),out var port)) return Problem("Invalid SQL port.");
     try { PortalStorage.SaveDatabase(name,new(name,f["host"].ToString(),port,f["database"].ToString(),f["username"].ToString())); return Results.Redirect(Link(name)); }
     catch { return Problem("Could not validate or save the SQL configuration."); }
 });
@@ -164,7 +164,7 @@ app.MapPost("/instance/{name}/policy", async (string name,HttpContext c) =>
 {
     var f=await c.Request.ReadFormAsync(); var mode=f["mode"].ToString();
     var categories=f.TryGetValue("category",out var list)?list.ToArray():[];
-    if(!int.TryParse(f["hours"],out var hours)||hours is <1 or >24) return Problem("Choose 1–24 hours.");
+    if(!int.TryParse(f["hours"].ToString(),out var hours)||hours is <1 or >24) return Problem("Choose 1–24 hours.");
     try
     {
         var previous=PortalStorage.Operator(name);
