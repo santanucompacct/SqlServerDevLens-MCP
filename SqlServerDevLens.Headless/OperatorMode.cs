@@ -49,7 +49,7 @@ public sealed record OperatorSettings(string Mode, DateTimeOffset? AutomaticUnti
     public SessionAuthorization NewAuthorization()
     {
         var policy = new SessionAuthorization();
-        if (Mode is "full" or "sql-only" && AutomaticUntilUtc > DateTimeOffset.UtcNow)
+        if ((Mode is "full" or "sql-only") && AutomaticUntilUtc > DateTimeOffset.UtcNow)
             foreach (var category in AutomaticCategories ?? []) policy.Set(category, true);
         return policy;
     }
