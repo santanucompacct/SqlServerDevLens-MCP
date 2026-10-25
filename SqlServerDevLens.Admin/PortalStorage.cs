@@ -85,15 +85,16 @@ public static class PortalStorage
     public static void SaveOperator(string name, OperatorConfig policy)
     {
         _ = Folder(name);
-        if (policy.Mode is not ("read-only" or "full") ||
+        if (policy.Mode is not ("read-only" or "full" or "sql-only") ||
+            policy.Mode == "sql-only" && policy.AutomaticCategories.Any(x => x.StartsWith("postman_", StringComparison.Ordinal)) ||
             policy.AutomaticCategories.Distinct(StringComparer.Ordinal).Count() != policy.AutomaticCategories.Length ||
             policy.AutomaticCategories.Any(x => !SessionAuthorization.Categories.Contains(x, StringComparer.Ordinal)) ||
-            policy.AutomaticCategories.Length > 0 && (policy.Mode != "full" ||
+            policy.AutomaticCategories.Length > 0 && (policy.Mode == "read-only" ||
                 policy.AutomaticUntilUtc is null ||
                 policy.AutomaticUntilUtc <= DateTimeOffset.UtcNow ||
                 policy.AutomaticUntilUtc > DateTimeOffset.UtcNow.AddHours(36)) ||
             policy.Postman is { } p && (!ValidPostmanId(p.WorkspaceId) || !ValidPostmanId(p.CollectionId)) ||
-            policy.Mode == "read-only" && policy.Postman is not null)
+            (policy.Mode is "read-only" or "sql-only") && policy.Postman is not null)
             throw new ArgumentException("Invalid/expired operator policy.");
         Replace(Path.Combine(Folder(name), "operator.json"), JsonSerializer.Serialize(policy, Json),
             "root:devlens-" + name, "0440");
