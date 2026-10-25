@@ -158,6 +158,26 @@ public static class PortalStorage
             return "SQL test failed. Check hostname, database, login, TLS settings and SQL connectivity. See system journal for details.";
         }
     }
+    public static string BootState(string name)
+    {
+        _ = Folder(name);
+        var runtime = GetEnabled("devlens@" + name + ".service");
+        var tunnel = GetEnabled("devlens-tunnel@" + name + ".service");
+        return runtime && tunnel ? "enabled" : "disabled";
+    }
+    private static bool GetEnabled(string unit)
+    {
+        var psi = new ProcessStartInfo("/usr/bin/systemctl")
+        {
+            RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false
+        };
+        psi.ArgumentList.Add("is-enabled");
+        psi.ArgumentList.Add(unit);
+        using var process = Process.Start(psi) ?? throw new InvalidOperationException("Could not query boot state.");
+        var result = process.StandardOutput.ReadToEnd().Trim();
+        if (!process.WaitForExit(5000)) { process.Kill(); return false; }
+        return process.ExitCode == 0 && result == "enabled";
+    }
     public static string UnitState(string name, bool tunnel)
     {
         _ = Folder(name);
