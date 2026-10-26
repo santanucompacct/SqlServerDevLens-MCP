@@ -168,7 +168,9 @@ app.MapGet("/instance/{name}", (string name) =>
             "<button name='action' value='stop'>Stop</button>");
         return Html(Page("Configure "+name,
             "<p class='muted'>SQL and Postman settings apply after restarting this instance. Dashboard and tunnel are isolated.</p>"+
-            "<section><h2>Step 1 — Choose integration mode</h2>"+modeForm+"</section>"+
+            "<section><h2>Step 1 — Choose integration mode</h2>"+
+            (op.Mode=="read-only"?"<p class='bad'>Legacy read-only mode is active. Save SQL Only here before configuring SQL authorization categories.</p>":"")+
+            modeForm+"</section>"+
             "<div class='grid'><section><h2>SQL Connection</h2>"+
             (string.IsNullOrWhiteSpace(d.Host)||string.IsNullOrWhiteSpace(d.Database)||string.IsNullOrWhiteSpace(d.Username)?
             "<p class='bad'>Required SQL connection details are missing.</p>":"")+
