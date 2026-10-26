@@ -22,7 +22,7 @@ cp docs/LINUX-ADMIN-PORTAL.md "$package/LINUX-ADMIN-PORTAL.md"
 cp LICENSE "$package/LICENSE" 2>/dev/null || cp LICENSE.txt "$package/LICENSE"
 dotnet list SqlServerDevLens.Headless/SqlServerDevLens.Headless.csproj package --include-transitive > "$package/DEPENDENCIES.txt"
 dotnet list SqlServerDevLens.Admin/SqlServerDevLens.Admin.csproj package --include-transitive >> "$package/DEPENDENCIES.txt"
-printf '{"product":"linux-headless-read-only","version":"0.1.0","commit":"%s","privateIdentityIncluded":false}\n' "$(git rev-parse HEAD)" > "$package/BUILD-INFO.json"
+printf '{"product":"linux-headless-multi-instance","version":"0.1.0","commit":"%s","privateIdentityIncluded":false}\n' "$(git rev-parse HEAD)" > "$package/BUILD-INFO.json"
 chmod 0755 "$package/linux/"*.sh
 python3 linux/protocol-smoke.py "$package/app/SqlServerDevLens.Headless"
 python3 linux/socket-smoke.py "$package/app/SqlServerDevLens.Headless"
