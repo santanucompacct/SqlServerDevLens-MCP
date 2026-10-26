@@ -4,7 +4,7 @@
 
 **Your SQL Server, understood by AI.** MIT-licensed .NET 10 / Avalonia desktop application with owl branding.
 
-**Experimental Linux headless build:** [separate read-only server, two-instance setup and limits](docs/LINUX-HEADLESS.md). This additional Ubuntu x64 build has ten read tools and no desktop, procedure execution, mutations or Postman. Windows projects and release workflows are unchanged. [Azure VM unattended boot/shutdown guide](docs/AZURE-VM-OPERATIONS.md). See the `Linux headless distribution` workflow for test packages; do not use Windows ZIPs on Linux.
+**Experimental Linux headless build:** [separate multi-instance server, SQL-only or SQL + Postman setup, security controls and limits](docs/LINUX-HEADLESS.md). This additional Ubuntu x64 build has a localhost administration portal, full SQL tools under expiring operator authorization, and optional Postman integration. The legacy read-only tool catalog remains available for existing read-only configurations. SQL-only mode does not require Postman. Windows projects and release workflows are unchanged. [Azure VM unattended boot/shutdown guide](docs/AZURE-VM-OPERATIONS.md). See the `Linux headless distribution` workflow for test packages; do not use Windows ZIPs on Linux.
 
 ## Latest 0.12.0 Windows packages
 
