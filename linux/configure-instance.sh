@@ -19,6 +19,14 @@ config['instanceId']=sys.argv[1]
 with open(sys.argv[2],'x') as f: json.dump(config,f,indent=2)
 PY
 chown "$account:$account" "$config/instance.json"; chmod 0400 "$config/instance.json"
+# New instances start in SQL-only full-tool mode with no preapproved mutations.
+# Keep the runtime's missing-policy fallback read-only as a safe failure default.
+python3 - "$config/operator.json" <<'PY'
+import json,sys
+with open(sys.argv[1], 'x') as f:
+    json.dump({'mode':'sql-only','automaticUntilUtc':None,'automaticCategories':[],'postman':None},f,indent=2)
+PY
+chown "root:$account" "$config/operator.json"; chmod 0440 "$config/operator.json"
 runuser -u "$account" -- env HOME="$state" /opt/devlens/tunnel/tunnel-client init --sample sample_mcp_stdio_local \
   --profile "$instance" --profile-dir "$state/profiles" --tunnel-id "$tunnel" \
   --control-plane-api-key-ref env:CONTROL_PLANE_API_KEY --health-listen-addr "127.0.0.1:$port" \
