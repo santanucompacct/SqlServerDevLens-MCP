@@ -1,0 +1,43 @@
+[Unit]
+Description=DevLens read-only SQL runtime instance %i
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=devlens-%i
+Group=devlens-%i
+Environment=HOME=/var/lib/devlens-%i
+Environment=XDG_CONFIG_HOME=/var/lib/devlens-%i/config
+Environment=XDG_CACHE_HOME=/var/lib/devlens-%i/cache
+Environment=XDG_STATE_HOME=/var/lib/devlens-%i/state
+WorkingDirectory=/var/lib/devlens-%i
+LoadCredential=sql-password:/etc/devlens/%i/sql-password
+RuntimeDirectory=devlens-%i
+RuntimeDirectoryMode=0700
+ExecStart=/opt/devlens/app/SqlServerDevLens.Headless --serve /etc/devlens/%i/instance.json --socket /run/devlens-%i/mcp.sock
+ExecStartPost=/opt/devlens/linux/wait-runtime.sh %i
+Restart=always
+RestartSec=10
+TimeoutStopSec=45
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/devlens-%i /run/devlens-%i
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=512M
+TasksMax=128
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

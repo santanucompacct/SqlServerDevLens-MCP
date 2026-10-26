@@ -1,0 +1,41 @@
+name: Linux headless distribution
+on:
+  push:
+    branches: [feature/linux-headless-multi-instance]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-headless:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: sudo apt-get update -qq && sudo apt-get install -y acl
+      - run: dotnet test SqlServerDevLens.Headless.Tests/SqlServerDevLens.Headless.Tests.csproj -c Release
+      - run: for file in linux/*.sh; do bash -n "$file"; done
+      - run: python3 linux/health-smoke.py
+      - name: Check private credential directories across Linux users
+        run: sudo env DEVLENS_DISPOSABLE_CI=1 bash linux/os-isolation-smoke.sh
+      - run: bash linux/build-package.sh
+      - name: Validate two offline instance profiles from the extracted package
+        run: sudo env DEVLENS_DISPOSABLE_CI=1 bash linux/provisioning-smoke.sh distribution/packages/linux-headless/SqlServerDevLens-linux-headless-0.1.0-linux-x64.tar.gz
+      - name: Check service unit syntax
+        run: |
+          sudo cp linux/devlens@.service linux/devlens-tunnel@.service linux/devlens-admin.service /run/systemd/system/
+          sudo mkdir -p /opt/devlens/linux
+          sudo install -m 0755 linux/start-tunnel.sh /opt/devlens/linux/
+          sudo systemd-analyze verify /run/systemd/system/devlens@.service /run/systemd/system/devlens-tunnel@.service /run/systemd/system/devlens-admin.service
+      - name: Verify unattended systemd lifecycle with offline tunnel fixture
+        run: sudo env DEVLENS_DISPOSABLE_CI=1 bash linux/systemd-smoke.sh
+      - name: Verify portal under real systemd sandbox with synthetic tenant credentials
+        run: sudo env DEVLENS_DISPOSABLE_CI=1 python3 linux/admin-systemd-smoke.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DevLens-linux-headless-${{ github.run_id }}
+          path: distribution/packages/linux-headless/*

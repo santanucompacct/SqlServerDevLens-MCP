@@ -1,0 +1,43 @@
+[Unit]
+Description=DevLens MCP tunnel instance %i
+Wants=network-online.target
+After=network-online.target devlens@%i.service
+Wants=devlens@%i.service
+PartOf=devlens@%i.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=devlens-%i
+Group=devlens-%i
+Environment=HOME=/var/lib/devlens-%i
+Environment=XDG_CONFIG_HOME=/var/lib/devlens-%i/config
+Environment=XDG_CACHE_HOME=/var/lib/devlens-%i/cache
+Environment=XDG_STATE_HOME=/var/lib/devlens-%i/state
+WorkingDirectory=/var/lib/devlens-%i
+LoadCredential=tunnel-key:/etc/devlens/%i/tunnel-key
+ExecStartPre=/opt/devlens/linux/wait-runtime.sh %i
+ExecStart=/opt/devlens/linux/start-tunnel.sh %i
+Restart=always
+RestartSec=20
+TimeoutStopSec=45
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/devlens-%i
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=256M
+TasksMax=128
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
