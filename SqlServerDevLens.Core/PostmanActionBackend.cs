@@ -305,6 +305,8 @@ public sealed class PostmanActionBackend : IPostmanActionBackend
     public async Task<PostmanActionResult> ApplyAsync(PostmanPlan plan,CancellationToken token)
     {
         await _actions.WaitAsync(token);
+        var stage = "preflight";
+        var submissionStarted = false;
         try
         {
             var current=await LoadAsync(token);
@@ -330,17 +332,22 @@ public sealed class PostmanActionBackend : IPostmanActionBackend
                 text=Redact(text,plan.Secrets);
                 return new("completed",HttpStatus:(int)response.StatusCode,Body:text,Truncated:false,Message:"HTTP status is not an application-level success guarantee. Inspect response status/data. Redirects were not followed; no scripts/tests ran.");
             }
+            stage = "private backup";
             await _backups.SaveAsync(plan.Backup,token);
             var path="collections/"+current.ApiId;
             if(plan.Action=="create_folder") path+="/folders";
             else path+="/requests"+(plan.Action=="edit_request"?"/"+Id(plan.TargetId):plan.FolderId.Length>0?"?folder="+Id(plan.FolderId):"");
+            stage = "Postman write submission";
+            submissionStarted = true; // Conservatively treat network errors as uncertain outcomes.
             using var result=await _control.GetAsync(Key,path,token,plan.Action=="edit_request"?HttpMethod.Put:HttpMethod.Post,plan.Payload);
             var id=result.RootElement.TryGetProperty("data",out var data) && data.TryGetProperty("id",out var itemId)?itemId.GetString():null;
             if(string.IsNullOrEmpty(id)) throw new InvalidOperationException("Postman write returned no resource ID. Verify before retry.");
+            stage = "Postman readback";
             var after=await LoadAsync(token); var saved=Find(after,id,plan.Action=="create_folder");
             if(saved.Item["name"]?.ToString()!=plan.Name) throw new InvalidOperationException("Postman save could not be verified. Inspect before retry.");
             if(plan.Action!="create_folder")
             {
+                stage = "Postman field verification";
                 using var verify=await _control.GetAsync(Key,"collections/"+after.ApiId+"/requests/"+Id(id),token);
                 var actual=JsonNode.Parse(verify.RootElement.GetRawText())?["data"]; var expected=JsonNode.Parse(plan.Payload)!;
                 foreach(var field in new[]{"method","url","rawModeData","headerData","auth"})
@@ -348,6 +355,26 @@ public sealed class PostmanActionBackend : IPostmanActionBackend
             }
             return new("saved",id,Message:"Approved Postman resource saved and read back. Private pre-change collection backup saved. Application request was not executed.");
         }
+        catch (PostmanReviewChangedException) { throw; }
+        catch (PostmanControlApiException error) when (plan.Action != "run")
+        { throw new PostmanWriteStageException(stage, $"Postman API returned HTTP {error.StatusCode}", submissionStarted); }
+        catch (OperationCanceledException) when (plan.Action != "run")
+        { throw new PostmanWriteStageException(stage, "operation cancelled or timed out", submissionStarted); }
+        catch (IOException) when (plan.Action != "run")
+        { throw new PostmanWriteStageException(stage, "private storage or response I/O failed", submissionStarted); }
+        catch (InvalidOperationException) when (plan.Action != "run")
+        {
+            var detail = stage switch
+            {
+                "private backup" => "private backup could not be saved",
+                "Postman readback" => "saved resource could not be read back or located",
+                "Postman field verification" => "saved fields did not match the approved request",
+                _ => "a validation, metadata, or provider operation failed"
+            };
+            throw new PostmanWriteStageException(stage, detail, submissionStarted);
+        }
+        catch (HttpRequestException) when (plan.Action != "run")
+        { throw new PostmanWriteStageException(stage, "network request failed", submissionStarted); }
         catch(HttpRequestException) { throw new InvalidOperationException("HTTP operation failed. Outcome may be uncertain; do not retry automatically."); }
         finally { _actions.Release(); }
     }
