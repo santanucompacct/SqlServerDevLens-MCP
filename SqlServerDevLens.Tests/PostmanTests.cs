@@ -52,7 +52,7 @@ public class PostmanTests
         Assert.DoesNotContain("fixture-valid", serialized); Assert.DoesNotContain("SCRIPTS-MUST-NOT-RUN", serialized);
         foreach (var key in new[] {"unauthorized", "forbidden", "rate-limit", "server-error", "redirect", "malformed"})
         {
-            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => client.WorkspacesAsync("fixture-" + key, timeout.Token));
+            var error = await Assert.ThrowsAnyAsync<InvalidOperationException>(() => client.WorkspacesAsync("fixture-" + key, timeout.Token));
             Assert.DoesNotContain("SECRET-", error.Message); Assert.DoesNotContain("fixture-", error.Message);
         }
         using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));

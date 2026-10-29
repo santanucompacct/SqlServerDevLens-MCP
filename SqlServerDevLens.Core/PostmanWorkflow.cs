@@ -23,6 +23,18 @@ internal sealed record ResolvedPostmanRequest(string Method, string Url, Diction
 public sealed record PostmanActionResult(string Status, string? ResourceId = null, int? HttpStatus = null,
     string? Body = null, bool Truncated = false, string Message = "", CapturedResultReference? Capture = null, bool ReadCapturedResult = false);
 public sealed class PostmanReviewChangedException() : InvalidOperationException("Postman collection, variables or authentication changed after review. Nothing was sent. Prepare and approve again.");
+    
+// Safe, phase-specific diagnostics. Does not expose provider response bodies, SQL, keys or payloads.
+public sealed class PostmanWriteStageException(string stage, string detail, bool submissionStarted) : InvalidOperationException(
+    $"Postman collection change failed during {stage}: {detail}. " +
+    (submissionStarted
+        ? "The write may have been saved; inspect the collection before taking any further action. "
+        : "No Postman write request was sent. ") +
+    "Approval was consumed; never retry automatically.")
+{
+    public string Stage { get; } = stage;
+    public bool SubmissionStarted { get; } = submissionStarted;
+}
 public sealed record PostmanItem(string Id, string Path, string Kind, string? Method);
 public interface IPostmanActionBackend : IDisposable
 {
@@ -123,6 +135,7 @@ public sealed class PostmanWorkflow(IPostmanActionBackend backend,
                     Message = result.Message + " Full masked HTTP result captured. Read read_result_page; do not run HTTP again to fetch pages." };
         }
         catch (PostmanReviewChangedException) { throw; }
+        catch (PostmanWriteStageException) { throw; }
         catch (Exception error) when (error is OperationCanceledException or InvalidOperationException or IOException)
         { throw new InvalidOperationException("Postman action failed or timed out. It may already have been saved or executed. Verify state; never retry automatically. Approval was consumed."); }
     }

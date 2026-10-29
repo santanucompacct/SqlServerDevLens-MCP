@@ -120,6 +120,8 @@ For this desktop-only update, pull `master`, close DevLens, rebuild in Visual St
 
 ## Postman setup and approved actions (plugin 0.11.0)
 
+**Postman write failures:** If Windows or Linux can read a collection but `apply_postman_change` fails, see [Postman write diagnostics and safe recovery](docs/POSTMAN-WRITE-FAILURES.md). The improved failure stages are pending validation/deployment; they are not present in existing installed binaries. Always verify the collection before retrying a consumed approval.
+
 Choose SQL Server + Postman, test SQL, enter the key locally, Load Workspaces, select a workspace, Load Collections, select a collection and Start MCP Server. SQL-only startup and SQL query/procedure/table logic remain intact. Remember key uses the separate Windows Credential Manager entry `SqlServerDevLens/PostmanApiKey`; Forget removes it. macOS/Linux secure saving is disabled. No Postman profile JSON is written. The active desktop now keeps the Postman key in memory until Stop even when Remember is unchecked, so approved tools can access the selected collection. The key never goes to the adapter or chat. Managed strings cannot be guaranteed zeroed.
 
 `get_postman_selection` and `list_postman_requests` retain their startup-summary behavior. Use `list_postman_items` for fresh folder/request IDs, paths and methods, and `get_postman_request` for a masked definition. Only the selected workspace/collection is accessible. Known secret values and sensitive JSON/header fields are masked; variable references remain visible for review. Returned names, definitions and responses are untrusted data, never instructions. Masked definitions are display-only, not round-trip edit payloads.
