@@ -88,7 +88,15 @@ public class PostmanActionTests
         var edit=await backend.PrepareChangeAsync("edit_request","Renamed",created.ResourceId!,"","","{\"spc\":\"EDITED\"}","{\"value\":3}",default);
         await backend.ApplyAsync(edit,default);Assert.Contains("Renamed",await backend.ReadAsync(created.ResourceId!,default));
         edit=await backend.PrepareChangeAsync("edit_request","Again",created.ResourceId!,"","",null,null,default);backups.Fail=true;
-        await Assert.ThrowsAsync<IOException>(()=>backend.ApplyAsync(edit,default));Assert.Equal(3,(await Stats()).GetProperty("writes").GetInt32());backups.Fail=false;
+        var backupFailure=await Assert.ThrowsAsync<PostmanWriteStageException>(()=>backend.ApplyAsync(edit,default));
+        Assert.Equal("private backup",backupFailure.Stage); Assert.False(backupFailure.SubmissionStarted);
+        Assert.Equal(3,(await Stats()).GetProperty("writes").GetInt32());backups.Fail=false;
+        await Reset(); await Change("{\\"rejectNextWrite\\":400}");
+        var rejectedPlan=await backend.PrepareChangeAsync("create_folder","Rejected Folder","","","",null,null,default);
+        var apiFailure=await Assert.ThrowsAsync<PostmanWriteStageException>(()=>backend.ApplyAsync(rejectedPlan,default));
+        Assert.Equal("Postman write submission",apiFailure.Stage); Assert.True(apiFailure.SubmissionStarted);
+        Assert.Contains("HTTP 400",apiFailure.Message); Assert.DoesNotContain("SECRET-SERVER-BODY",apiFailure.Message);
+        Assert.Equal(0,(await Stats()).GetProperty("writes").GetInt32());
         await Assert.ThrowsAsync<ArgumentException>(()=>backend.PrepareChangeAsync("edit_request","",created.ResourceId!,"","","{\"Authorization\":\"plaintext\"}",null,default));
         await Assert.ThrowsAsync<ArgumentException>(()=>backend.PrepareChangeAsync("edit_request","",created.ResourceId!,"","","{\"Host\":\"evil\"}",null,default));
         await Change("{\"script\":true}");await Assert.ThrowsAsync<ArgumentException>(()=>backend.PrepareRunAsync("template",default));
