@@ -1,8 +1,8 @@
 // Synthetic mutable Postman API + application fixture. Never contacts a real service.
 const http = require('http');
-let collection, writes, runs, sequence;
+let collection, writes, runs, sequence, rejectNextWrite;
 function reset() {
-  writes=0; runs=0; sequence=0;
+  writes=0; runs=0; sequence=0; rejectNextWrite=0;
   collection={info:{_postman_id:'actions',uid:'123-actions',name:'Action Fixture'},
     variable:[{key:'baseUrl',value:'http://127.0.0.1:4917/actions/application/'},{key:'azure_api_key',value:'SENSITIVE-APP-KEY'}],
     auth:{type:'apikey',apikey:[{key:'in',value:'header'},{key:'key',value:'x-functions-key'},{key:'value',value:'{{azure_api_key}}'}]},
@@ -33,6 +33,7 @@ http.createServer(async (req,res)=>{
   if(url.pathname==='/test/reset') {reset();return reply(200,{ok:true});}
   if(url.pathname==='/test/stats') return reply(200,{writes,runs});
   if(url.pathname==='/test/change') {
+    if(body.rejectNextWrite) rejectNextWrite=body.rejectNextWrite;
     if(body.script) all().find(x=>x.id==='template').event=[{listen:'prerequest',script:{exec:['throw new Error("must not run")']}}];
     if(body.route) all().find(x=>x.id==='template').request.url.raw='{{baseUrl}}'+body.route;
     if(Object.prototype.hasOwnProperty.call(body,'variable')) collection.variable[1].value=body.variable;
@@ -43,10 +44,12 @@ http.createServer(async (req,res)=>{
   const requestMatch=url.pathname.match(/^\/collections\/actions\/requests\/([^/]+)$/);
   if(req.method==='GET'&&requestMatch) {const item=all().find(x=>x.id===requestMatch[1]);return item?.request?reply(200,{data:native(item)}):reply(404,{error:'missing'});}
   if(req.method==='POST'&&url.pathname==='/collections/actions/folders') {
+    if(rejectNextWrite) {const status=rejectNextWrite;rejectNextWrite=0;return reply(status,{error:'SECRET-SERVER-BODY-NEVER-DISPLAY'});}
     const item={id:'new-folder-'+(++sequence),name:body.name,item:[]};
     (body.folder?all().find(x=>x.id===body.folder).item:collection.item).push(item);writes++;return reply(200,{data:{id:item.id}});
   }
   if((req.method==='POST'&&url.pathname==='/collections/actions/requests')||(req.method==='PUT'&&requestMatch)) {
+    if(rejectNextWrite) {const status=rejectNextWrite;rejectNextWrite=0;return reply(status,{error:'SECRET-SERVER-BODY-NEVER-DISPLAY'});}
     const item=req.method==='PUT'?all().find(x=>x.id===requestMatch[1]):{id:'new-request-'+(++sequence)};
     item.name=body.name; item.event=body.events??[];
     item.request={method:body.method,url:{raw:body.url},header:(body.headerData??[]).map(h=>({key:h.key,value:h.value,disabled:h.enabled===false})),
