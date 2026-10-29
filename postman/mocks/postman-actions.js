@@ -39,12 +39,12 @@ http.createServer(async (req,res)=>{
     collection.info.revision=(collection.info.revision??0)+1;return reply(200,{ok:true});
   }
   if(req.method==='GET'&&url.pathname==='/workspaces/workspace-actions') return reply(200,{workspace:{id:'workspace-actions',name:'Fixture',collections:[{id:'actions',uid:'123-actions',name:'Action Fixture'}]}});
-  if(req.method==='GET'&&url.pathname==='/collections/123-actions') return reply(200,{collection});
+  if(req.method==='GET'&&url.pathname==='/collections/123-actions') return reply(200,{collection:JSON.parse(JSON.stringify(collection,(key,value)=>key==='item'&&Array.isArray(value)&&value.length===0?undefined:value))});
   const requestMatch=url.pathname.match(/^\/collections\/actions\/requests\/([^/]+)$/);
   if(req.method==='GET'&&requestMatch) {const item=all().find(x=>x.id===requestMatch[1]);return item?.request?reply(200,{data:native(item)}):reply(404,{error:'missing'});}
   if(req.method==='POST'&&url.pathname==='/collections/actions/folders') {
     const item={id:'new-folder-'+(++sequence),name:body.name,item:[]};
-    (body.folder?all().find(x=>x.id===body.folder).item:collection.item).push(item);writes++;return reply(200,{data:{id:item.id}});
+    (body.folder?all().find(x=>x.id===body.folder).item:collection.item).push(item);writes++;return reply(200,{data:[{id:item.id}]});
   }
   if((req.method==='POST'&&url.pathname==='/collections/actions/requests')||(req.method==='PUT'&&requestMatch)) {
     const item=req.method==='PUT'?all().find(x=>x.id===requestMatch[1]):{id:'new-request-'+(++sequence)};

@@ -88,7 +88,7 @@ public class PostmanActionTests
         var edit=await backend.PrepareChangeAsync("edit_request","Renamed",created.ResourceId!,"","","{\"spc\":\"EDITED\"}","{\"value\":3}",default);
         await backend.ApplyAsync(edit,default);Assert.Contains("Renamed",await backend.ReadAsync(created.ResourceId!,default));
         edit=await backend.PrepareChangeAsync("edit_request","Again",created.ResourceId!,"","",null,null,default);backups.Fail=true;
-        await Assert.ThrowsAsync<IOException>(()=>backend.ApplyAsync(edit,default));Assert.Equal(3,(await Stats()).GetProperty("writes").GetInt32());backups.Fail=false;
+        var backupError = await Assert.ThrowsAsync<PostmanActionException>(()=>backend.ApplyAsync(edit,default)); Assert.Contains("backup", backupError.Message); Assert.Contains("not_sent", backupError.Message);Assert.Equal(3,(await Stats()).GetProperty("writes").GetInt32());backups.Fail=false;
         await Assert.ThrowsAsync<ArgumentException>(()=>backend.PrepareChangeAsync("edit_request","",created.ResourceId!,"","","{\"Authorization\":\"plaintext\"}",null,default));
         await Assert.ThrowsAsync<ArgumentException>(()=>backend.PrepareChangeAsync("edit_request","",created.ResourceId!,"","","{\"Host\":\"evil\"}",null,default));
         await Change("{\"script\":true}");await Assert.ThrowsAsync<ArgumentException>(()=>backend.PrepareRunAsync("template",default));
@@ -114,6 +114,30 @@ public class PostmanActionTests
         await Reset();await Change("{\"route\":\"unauthorized\"}");run=await backend.PrepareRunAsync("template",default);response=await backend.ApplyAsync(run,default);Assert.Equal(401,response.HttpStatus);Assert.DoesNotContain("SENSITIVE-APP-KEY",response.Body);
         await Reset();await Change("{\"variable\":\"\"}");await Assert.ThrowsAsync<ArgumentException>(()=>backend.PrepareRunAsync("template",default));
         await Reset();await Change("{\"variable\":\"fixture-action-key\"}");await Assert.ThrowsAsync<ArgumentException>(()=>backend.PrepareRunAsync("template",default));
+    }
+    [Fact]
+    public async Task SafeActionDiagnosticsSurviveWorkflowAndApprovalIsConsumed()
+    {
+        using var workflow = new PostmanWorkflow(new DiagnosticBackend(), (_, approve, _) => approve(true));
+        var staged = await workflow.PrepareChangeAsync("create_folder", "Test", "", "", "", null, null, default);
+        var error = await Assert.ThrowsAsync<PostmanActionException>(() => workflow.ApplyAsync(staged.RequestId, false, default));
+        Assert.Contains("verification", error.Message);
+        Assert.Contains("HTTP 403", error.Message);
+        Assert.Contains("save_accepted_verification_incomplete", error.Message);
+        await Assert.ThrowsAsync<ArgumentException>(() => workflow.ApplyAsync(staged.RequestId, false, default));
+    }
+    private sealed class DiagnosticBackend : IPostmanActionBackend
+    {
+        public string CollectionName => "Fixture";
+        public Task<PostmanItem[]> ListAsync(CancellationToken token) => Task.FromResult<PostmanItem[]>([]);
+        public Task<string> ReadAsync(string id, CancellationToken token) => Task.FromResult("");
+        public Task<PostmanPlan> PrepareChangeAsync(string action, string name, string requestId, string templateRequestId,
+            string folderId, string? headersJson, string? bodyJson, CancellationToken token) =>
+            Task.FromResult(new PostmanPlan(action, name, "revision", "", "", "scope"));
+        public Task<PostmanPlan> PrepareRunAsync(string id, CancellationToken token) => throw new NotSupportedException();
+        public Task<PostmanActionResult> ApplyAsync(PostmanPlan plan, CancellationToken token) =>
+            throw new PostmanActionException("verification", "save_accepted_verification_incomplete", 403);
+        public void Dispose() { }
     }
     private sealed class Backups : IPostmanBackupStore
     { public int Count;public bool Fail;public Task SaveAsync(string json,CancellationToken token){if(Fail)throw new IOException("Simulated backup failure");Count++;return Task.CompletedTask;} }

@@ -123,6 +123,7 @@ public sealed class PostmanWorkflow(IPostmanActionBackend backend,
                     Message = result.Message + " Full masked HTTP result captured. Read read_result_page; do not run HTTP again to fetch pages." };
         }
         catch (PostmanReviewChangedException) { throw; }
+        catch (PostmanActionException) { throw; }
         catch (Exception error) when (error is OperationCanceledException or InvalidOperationException or IOException)
         { throw new InvalidOperationException("Postman action failed or timed out. It may already have been saved or executed. Verify state; never retry automatically. Approval was consumed."); }
     }

@@ -6,6 +6,11 @@ using System.Text.RegularExpressions;
 
 namespace SqlServerDevLens.Core;
 
+public sealed class PostmanActionException(string stage, string outcome, int? httpStatus = null)
+    : InvalidOperationException($"Postman action failed at {stage}; outcome: {outcome}." +
+        (httpStatus is int status ? $" Control API HTTP {status}." : "") +
+        " Approval was consumed. Verify state; never retry automatically.");
+
 public interface IPostmanBackupStore { Task SaveAsync(string json, CancellationToken token); }
 public sealed class PrivatePostmanBackupStore(string? directory = null) : IPostmanBackupStore
 {
@@ -151,7 +156,7 @@ public sealed class PostmanActionBackend : IPostmanActionBackend
         Walk(snapshot.Collection,[snapshot.Collection],"",0); return result;
     }
     private static Located Find(Snapshot snapshot, string id, bool folder = false) => Items(snapshot).SingleOrDefault(x=>x.Item["id"]?.ToString()==Id(id) &&
-        (folder ? x.Item["item"] is JsonArray : x.Item["request"] is JsonObject)) ?? throw new ArgumentException("Selected item is not a visible request/folder in this collection.");
+        (folder ? x.Item["request"] is null : x.Item["request"] is JsonObject)) ?? throw new ArgumentException("Selected item is not a visible request/folder in this collection.");
     public async Task<PostmanItem[]> ListAsync(CancellationToken token)
     {
         var snapshot=await LoadAsync(token);
@@ -184,7 +189,7 @@ public sealed class PostmanActionBackend : IPostmanActionBackend
         if(action=="create_folder")
         {
             Name(name);
-            if((parent??snapshot.Collection)["item"]!.AsArray().OfType<JsonObject>().Any(x=>x["name"]?.ToString()==name)) throw new ArgumentException("An item with that name already exists in this folder.");
+            if(((parent??snapshot.Collection)["item"] as JsonArray ?? []).OfType<JsonObject>().Any(x=>x["name"]?.ToString()==name)) throw new ArgumentException("An item with that name already exists in this folder.");
             var payload=new JsonObject { ["name"]=name }; if(parent is not null) payload["folder"]=Id(folderId);
             return new(action,name,snapshot.Revision,"",Mask(payload,snapshot.Secrets),Scope(snapshot,CollectionName))
             { Payload=payload.ToJsonString(),FolderId=folderId,Backup=snapshot.Collection.ToJsonString(),Secrets=snapshot.Secrets };
@@ -211,7 +216,7 @@ public sealed class PostmanActionBackend : IPostmanActionBackend
         foreach(var field in new[]{"name","description","method","url","headerData","queryParams","dataMode","rawModeData","dataOptions","auth","events","protocolProfileBehavior","pathVariableData","variables","dataDisabled"})
             proposed[field]=native[field]?.DeepClone();
         if(name.Length>0) proposed["name"]=Name(name); else if(action=="create_request") throw new ArgumentException("New request name is required.");
-        if(action=="create_request" && (parent??snapshot.Collection)["item"]!.AsArray().OfType<JsonObject>().Any(x=>x["name"]?.ToString()==name)) throw new ArgumentException("An item with that name already exists in this folder.");
+        if(action=="create_request" && ((parent??snapshot.Collection)["item"] as JsonArray ?? []).OfType<JsonObject>().Any(x=>x["name"]?.ToString()==name)) throw new ArgumentException("An item with that name already exists in this folder.");
         if(bodyJson is not null)
         {
             if(bodyJson.Length>20000) throw new ArgumentException("JSON body exceeds 20,000 characters.");
@@ -304,13 +309,18 @@ public sealed class PostmanActionBackend : IPostmanActionBackend
     }
     public async Task<PostmanActionResult> ApplyAsync(PostmanPlan plan,CancellationToken token)
     {
+        var stage = "queue";
+        var outcome = "not_sent";
         await _actions.WaitAsync(token);
         try
         {
+            stage = "revision_check";
             var current=await LoadAsync(token);
             if(current.Revision!=plan.Revision) throw new PostmanReviewChangedException();
             if(plan.Action=="run")
             {
+                stage = "application_request";
+                outcome = "uncertain";
                 var resolved=plan.Request!;
                 using var request=new HttpRequestMessage(new HttpMethod(resolved.Method),resolved.Url);
                 if(resolved.Body is not null) request.Content=new StringContent(resolved.Body,Encoding.UTF8,"application/json");
@@ -330,12 +340,21 @@ public sealed class PostmanActionBackend : IPostmanActionBackend
                 text=Redact(text,plan.Secrets);
                 return new("completed",HttpStatus:(int)response.StatusCode,Body:text,Truncated:false,Message:"HTTP status is not an application-level success guarantee. Inspect response status/data. Redirects were not followed; no scripts/tests ran.");
             }
+            stage = "backup";
             await _backups.SaveAsync(plan.Backup,token);
             var path="collections/"+current.ApiId;
             if(plan.Action=="create_folder") path+="/folders";
             else path+="/requests"+(plan.Action=="edit_request"?"/"+Id(plan.TargetId):plan.FolderId.Length>0?"?folder="+Id(plan.FolderId):"");
+            stage = "save";
+            outcome = "uncertain";
             using var result=await _control.GetAsync(Key,path,token,plan.Action=="edit_request"?HttpMethod.Put:HttpMethod.Post,plan.Payload);
-            var id=result.RootElement.TryGetProperty("data",out var data) && data.TryGetProperty("id",out var itemId)?itemId.GetString():null;
+            stage = "verification";
+            outcome = "save_accepted_verification_incomplete";
+            // Folder endpoints can return data as a one-element array.
+            var data = result.RootElement.TryGetProperty("data", out var responseData) ? responseData : default;
+            if (data.ValueKind == JsonValueKind.Array && data.GetArrayLength() == 1) data = data[0];
+            var id = data.ValueKind == JsonValueKind.Object && data.TryGetProperty("id", out var itemId)
+                && itemId.ValueKind == JsonValueKind.String ? itemId.GetString() : null;
             if(string.IsNullOrEmpty(id)) throw new InvalidOperationException("Postman write returned no resource ID. Verify before retry.");
             var after=await LoadAsync(token); var saved=Find(after,id,plan.Action=="create_folder");
             if(saved.Item["name"]?.ToString()!=plan.Name) throw new InvalidOperationException("Postman save could not be verified. Inspect before retry.");
@@ -348,7 +367,15 @@ public sealed class PostmanActionBackend : IPostmanActionBackend
             }
             return new("saved",id,Message:"Approved Postman resource saved and read back. Private pre-change collection backup saved. Application request was not executed.");
         }
-        catch(HttpRequestException) { throw new InvalidOperationException("HTTP operation failed. Outcome may be uncertain; do not retry automatically."); }
+        catch (PostmanReviewChangedException) { throw; }
+        catch (PostmanControlException error)
+        {
+            // An explicit rejection of the mutation is different from a failed verification GET.
+            throw new PostmanActionException(stage, stage == "save" ? "save_rejected" : outcome, error.HttpStatus);
+        }
+        catch (Exception error) when (error is HttpRequestException or OperationCanceledException or
+            InvalidOperationException or IOException or ArgumentException or JsonException)
+        { throw new PostmanActionException(stage, outcome); }
         finally { _actions.Release(); }
     }
     public void Dispose() { _key=null; _control.Dispose(); _application.Dispose(); }
