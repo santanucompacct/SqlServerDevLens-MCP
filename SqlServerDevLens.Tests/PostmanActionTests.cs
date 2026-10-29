@@ -91,7 +91,7 @@ public class PostmanActionTests
         var backupFailure=await Assert.ThrowsAsync<PostmanWriteStageException>(()=>backend.ApplyAsync(edit,default));
         Assert.Equal("private backup",backupFailure.Stage); Assert.False(backupFailure.SubmissionStarted);
         Assert.Equal(3,(await Stats()).GetProperty("writes").GetInt32());backups.Fail=false;
-        await Reset(); await Change("{\\"rejectNextWrite\\":400}");
+        await Reset(); await Change("{\"rejectNextWrite\":400}");
         var rejectedPlan=await backend.PrepareChangeAsync("create_folder","Rejected Folder","","","",null,null,default);
         var apiFailure=await Assert.ThrowsAsync<PostmanWriteStageException>(()=>backend.ApplyAsync(rejectedPlan,default));
         Assert.Equal("Postman write submission",apiFailure.Stage); Assert.True(apiFailure.SubmissionStarted);
