@@ -3,6 +3,10 @@ using System.Text.Json;
 
 namespace SqlServerDevLens.Core;
 
+// Fixed diagnostic fields only: never expose provider bodies, URLs or credentials.
+public sealed class PostmanControlException(int status) : InvalidOperationException($"Postman control API returned HTTP {status}.")
+{ public int HttpStatus { get; } = status; }
+
 public sealed record PostmanChoice(string Id, string Name)
 {
     public override string ToString() => $"{Name} ({Id})";
@@ -57,14 +61,7 @@ public sealed class PostmanClient : IPostmanClient, IDisposable
             request.Headers.Add("X-API-Key", key);
             using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
             if (!response.IsSuccessStatusCode)
-                throw new InvalidOperationException(response.StatusCode switch
-                {
-                    HttpStatusCode.Unauthorized => "Postman rejected the API key (401). Check or regenerate it.",
-                    HttpStatusCode.Forbidden => "Postman denied access (403). Check workspace permissions, region and plan restrictions.",
-                    HttpStatusCode.NotFound => "Postman resource not found or no longer accessible (404). Reload the lists.",
-                    HttpStatusCode.TooManyRequests => "Postman rate limit reached (429). Wait before loading again.",
-                    _ => $"Postman returned HTTP {(int)response.StatusCode}. Try again later."
-                });
+                throw new PostmanControlException((int)response.StatusCode);
             const int limit = 4 * 1024 * 1024;
             if (response.Content.Headers.ContentLength > limit) throw new InvalidOperationException("Postman response exceeds the 4 MB limit.");
             await using var input = await response.Content.ReadAsStreamAsync(token);
