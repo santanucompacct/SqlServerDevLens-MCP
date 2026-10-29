@@ -6,6 +6,18 @@
 
 **Experimental Linux headless build:** [separate multi-instance server, SQL-only or SQL + Postman setup, security controls and limits](docs/LINUX-HEADLESS.md). This additional Ubuntu x64 build has a localhost administration portal, full SQL tools under expiring operator authorization, and optional Postman integration. The legacy read-only tool catalog remains available for existing read-only configurations. SQL-only mode does not require Postman. Windows projects and release workflows are unchanged. [Azure VM unattended boot/shutdown guide](docs/AZURE-VM-OPERATIONS.md). See the `Linux headless distribution` workflow for test packages; do not use Windows ZIPs on Linux.
 
+## Development status and next stage (29 October 2026)
+
+**Current phase accepted:** The project owner reports that testing of the current DevLens implementation is complete for the agreed scope. This includes the successful Linux headless/systemd service implementation and use of multiple Secure MCP Tunnel connections. Existing Windows, Linux and tunnel behavior, security boundaries and published package/release distinctions remain as documented; this acceptance does not certify every possible production deployment.
+
+**Next stage — planned, not implemented:**
+
+1. **Priority 1: Dependency and change-impact analysis.** Map direct/transitive references among stored procedures, tables, views and functions, identify upstream/downstream dependencies, and report possible impact before changes. Flag unresolved/dynamic SQL references rather than implying the graph is complete.
+2. **Priority 2: Stored procedure version history.** Build secure history, full-definition comparisons and a controlled restore *proposal* workflow. Existing revision checks and mandatory pre-ALTER backups remain in place, but are not full version control or automatic rollback.
+3. **Acceptance for new features:** Test read-only graph accuracy, metadata/permission limitations, private history storage, explicit approval/revision safety, Linux multi-instance isolation, Windows regressions and tunnel use before announcing delivery.
+
+See **[the next-stage roadmap and acceptance criteria](docs/NEXT-STAGE-ROADMAP.md)**. This is a development plan, not a new package version or release.
+
 ## Latest 0.12.0 Windows packages
 
 - **Tunnel / ChatGPT Web (includes Start-All.cmd):** [download tested tunnel artifact](https://github.com/santanucompacct/SqlServerDevLens-MCP/actions/runs/39365983048/artifacts/12239920410).
@@ -218,7 +230,7 @@ Normal CI skips this live test and has no SQL credentials. GitHub Actions restor
 - Tests: unit, transport, UI and opt-in live SQL verification.
 - plugins / .agents: local package and marketplace; scripts: protocol smoke test.
 
-Future work: additional read-only schema details/pagination, broader carefully reviewed SQL support, macOS/Linux secure storage, installers and broader Postman auth/environment/runtime support. Procedures may write data only through the explicit approval workflow. Approved table INSERT/UPDATE and selected schema changes are supported as described above. DROP/TRUNCATE, unrestricted writes and automatic migrations are outside this milestone.
+**Next development stage:** dependency/change-impact analysis first, followed by secure stored procedure history and controlled restoration proposals; see [the planned roadmap](docs/NEXT-STAGE-ROADMAP.md). Other future work includes additional read-only schema details/pagination, broader carefully reviewed SQL support, macOS/Linux secure storage, installers and broader Postman auth/environment/runtime support. Procedures may write data only through the explicit approval workflow. Approved table INSERT/UPDATE and selected schema changes are supported as described above. DROP/TRUNCATE, unrestricted writes and automatic migrations are outside this milestone.
 
 Licensed under [MIT](LICENSE.txt). Third-party tools retain their own licenses.
 
