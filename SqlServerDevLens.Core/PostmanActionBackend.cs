@@ -362,13 +362,19 @@ public sealed class PostmanActionBackend : IPostmanActionBackend
         { throw new PostmanWriteStageException(stage, "operation cancelled or timed out", submissionStarted); }
         catch (IOException) when (plan.Action != "run")
         { throw new PostmanWriteStageException(stage, "private storage or response I/O failed", submissionStarted); }
+        catch (UnauthorizedAccessException) when (plan.Action != "run")
+        { throw new PostmanWriteStageException(stage, "private storage permission denied", submissionStarted); }
+        catch (JsonException) when (plan.Action != "run")
+        { throw new PostmanWriteStageException(stage, "Postman metadata or response was not valid JSON", submissionStarted); }
+        catch (ArgumentException) when (plan.Action != "run")
+        { throw new PostmanWriteStageException(stage, "a resource ID or response value was invalid", submissionStarted); }
         catch (InvalidOperationException) when (plan.Action != "run")
         {
             var detail = stage switch
             {
                 "private backup" => "private backup could not be saved",
                 "Postman readback" => "saved resource could not be read back or located",
-                "Postman field verification" => "saved fields did not match the approved request",
+                "Postman field verification" => "readback failed or saved fields differed from the approved request",
                 _ => "a validation, metadata, or provider operation failed"
             };
             throw new PostmanWriteStageException(stage, detail, submissionStarted);
